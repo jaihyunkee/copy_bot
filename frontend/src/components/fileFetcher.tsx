@@ -55,6 +55,7 @@ const FileFetcher: React.FC<FileFetecherProps> = ({
     e.preventDefault()
     onSubmit(e)
     
+    // Simulate fetching files after form submission
     setTimeout(() => {
       const mockFiles = [
         'index.js', 'styles.css', 'components/Header.jsx', 'utils/helpers.ts', 'README.md',
@@ -63,7 +64,7 @@ const FileFetcher: React.FC<FileFetecherProps> = ({
       ]
       setFiles(mockFiles)
       setFilteredFiles(mockFiles)
-      setShowFiles(true)
+      setShowFiles(true)  // Show files after form submission
       setSelectedExtensions([])
     }, 500)
   }
@@ -105,6 +106,7 @@ const FileFetcher: React.FC<FileFetecherProps> = ({
     setFileName(file.name)
     setGithubLink(`${file.name} (Uploaded ZIP file)`)
     
+    // Simulate fetching ZIP files after it's dropped
     setTimeout(() => {
       const mockZipFiles = [
         'main.js', 'style.css', 'index.html', 'assets/image.png', 'assets/logo.svg',
@@ -112,8 +114,7 @@ const FileFetcher: React.FC<FileFetecherProps> = ({
       ]
       setFiles(mockZipFiles)
       setFilteredFiles(mockZipFiles)
-      setShowFiles(true)
-      setSelectedExtensions([])
+      // Keep files hidden until "Go" is clicked
     }, 500)
   }
 

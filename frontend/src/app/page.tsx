@@ -8,9 +8,28 @@ export default function Home() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log('Submitted:', githubLink)
-    // Here you would make your API call to the backend
-    // to fetch the file list based on the githubLink
+
+    // Construct the payload (dummy data)
+    const payload = { githubLink }
+
+    try {
+      const response = await fetch('/go', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload), // Sending the dummy data
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        console.log('Response from backend:', result)
+      } else {
+        console.error('Failed to send request')
+      }
+    } catch (error) {
+      console.error('Error during fetch:', error)
+    }
   }
 
   return (
