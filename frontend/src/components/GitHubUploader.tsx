@@ -3,7 +3,7 @@ import React from 'react'
 interface GitHubUploaderProps {
   githubLink: string
   setGithubLink: (link: string) => void
-  onSubmit: (e: React.FormEvent) => Promise<void>
+  onSubmit: (e: React.FormEvent) => void; // HTMLFormElement 제거
 }
 
 const GitHubUploader: React.FC<GitHubUploaderProps> = ({
