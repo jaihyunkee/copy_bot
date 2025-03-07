@@ -6,32 +6,6 @@ import FileFetcher from '@/components/fileFetcher'
 export default function Home() {
   const [githubLink, setGithubLink] = useState<string>('')
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-
-    // Construct the payload (dummy data)
-    const payload = { githubLink }
-
-    try {
-      const response = await fetch('/go', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload), // Sending the dummy data
-      })
-
-      if (response.ok) {
-        const result = await response.json()
-        console.log('Response from backend:', result)
-      } else {
-        console.error('Failed to send request')
-      }
-    } catch (error) {
-      console.error('Error during fetch:', error)
-    }
-  }
-
   return (
     <main className="flex flex-col items-center justify-center min-h-screen bg-white">
       <div className="text-center w-full max-w-2xl px-4">
@@ -53,14 +27,12 @@ export default function Home() {
             <path d="M16 13H8" />
             <path d="M16 17H8" />
           </svg>
-
           <h1 className="text-4xl font-bold text-blue-600">Copy Bot</h1>
         </div>
         
         <FileFetcher 
           githubLink={githubLink}
           setGithubLink={(value) => setGithubLink(value)}
-          onSubmit={(e) => handleSubmit(e)}
         />
       </div>
     </main>

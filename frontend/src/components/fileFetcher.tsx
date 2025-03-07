@@ -1,25 +1,25 @@
 import React, { useState, useEffect } from 'react'
 
-interface FileFetecherProps {
+interface FileFetcherProps {
   githubLink: string
   setGithubLink: (link: string) => void
-  onSubmit: (e: React.FormEvent) => void
 }
 
-const FileFetcher: React.FC<FileFetecherProps> = ({
+const FileFetcher: React.FC<FileFetcherProps> = ({
   githubLink,
   setGithubLink,
-  onSubmit
 }) => {
+  const [file, setFile] = useState<File | null>(null)
+  const [fileName, setFileName] = useState<string | null>(null)
   const [files, setFiles] = useState<string[]>([])
+  const [sessionId, setSessionId] = useState<string>('')
   const [showFiles, setShowFiles] = useState(false)
   const [extensions, setExtensions] = useState<string[]>([])
   const [selectedExtensions, setSelectedExtensions] = useState<string[]>([])
   const [filteredFiles, setFilteredFiles] = useState<string[]>([])
   const [isDragging, setIsDragging] = useState(false)
-  const [fileName, setFileName] = useState<string | null>(null)
 
-  // Extract extensions from file list
+  // 파일 목록이 업데이트되면 확장자 목록 추출
   useEffect(() => {
     if (files.length > 0) {
       const exts = files
@@ -28,13 +28,12 @@ const FileFetcher: React.FC<FileFetecherProps> = ({
           return parts.length > 1 ? `.${parts[parts.length - 1]}` : null
         })
         .filter((ext): ext is string => ext !== null)
-        
       const uniqueExts = Array.from(new Set(exts)).sort()
       setExtensions(uniqueExts)
     }
   }, [files])
 
-  // Filter files based on selected extensions
+  // 선택한 확장자에 따라 파일 필터링
   useEffect(() => {
     if (selectedExtensions.length === 0) {
       setFilteredFiles(files)
@@ -51,22 +50,40 @@ const FileFetcher: React.FC<FileFetecherProps> = ({
     }
   }, [files, selectedExtensions])
 
+  // 폼 제출: FormData로 githubLink 또는 file을 백엔드로 POST 전송
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    onSubmit(e)
-    
-    // Simulate fetching files after form submission
-    setTimeout(() => {
-      const mockFiles = [
-        'index.js', 'styles.css', 'components/Header.jsx', 'utils/helpers.ts', 'README.md',
-        'john.py', 'aiden.py', 'chul.py', 'jay.cpp', 'package.json', 
-        'tsconfig.json', 'next.config.js', 'app/layout.tsx', 'app/page.tsx'
-      ]
-      setFiles(mockFiles)
-      setFilteredFiles(mockFiles)
-      setShowFiles(true)  // Show files after form submission
-      setSelectedExtensions([])
-    }, 500)
+    if (!githubLink && !file) {
+      alert("Please enter a GitHub link or upload a ZIP file.")
+      return
+    }
+    const formData = new FormData()
+    if (githubLink) {
+      formData.append('githubLink', githubLink)
+    }
+    if (file) {
+      formData.append('file', file)
+    }
+    try {
+      const response = await fetch('http://127.0.0.1:5000/go', {
+        method: 'POST',
+        body: formData
+        // Content-Type는 FormData 사용 시 브라우저가 자동 설정합니다.
+      })
+      if (response.ok) {
+        const result = await response.json()
+        console.log('Response from backend:', result)
+        setSessionId(result.session_id)
+        setFiles(result.file_paths)
+        setShowFiles(true)
+        setSelectedExtensions([])
+      } else {
+        const err = await response.json()
+        console.error('Backend error:', err)
+      }
+    } catch (error) {
+      console.error('Error during fetch:', error)
+    }
   }
 
   const toggleExtension = (ext: string) => {
@@ -90,12 +107,11 @@ const FileFetcher: React.FC<FileFetecherProps> = ({
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
     setIsDragging(false)
-    
     const droppedFiles = e.dataTransfer.files
     if (droppedFiles.length > 0) {
-      const file = droppedFiles[0]
-      if (file.type === 'application/zip' || file.type === 'application/x-zip-compressed') {
-        handleZipFile(file)
+      const droppedFile = droppedFiles[0]
+      if (droppedFile.type === 'application/zip' || droppedFile.type === 'application/x-zip-compressed') {
+        handleZipFile(droppedFile)
       } else {
         alert('Please drop a ZIP file')
       }
@@ -103,22 +119,14 @@ const FileFetcher: React.FC<FileFetecherProps> = ({
   }
 
   const handleZipFile = (file: File) => {
+    setFile(file)
     setFileName(file.name)
+    // 표시용으로 githubLink에 파일명을 넣을 수 있으나 실제 값은 사용자가 입력한 URL과 구분해야 함.
     setGithubLink(`${file.name} (Uploaded ZIP file)`)
-    
-    // Simulate fetching ZIP files after it's dropped
-    setTimeout(() => {
-      const mockZipFiles = [
-        'main.js', 'style.css', 'index.html', 'assets/image.png', 'assets/logo.svg',
-        'lib/util.js', 'lib/helper.ts', 'data.json', 'README.md'
-      ]
-      setFiles(mockZipFiles)
-      setFilteredFiles(mockZipFiles)
-      // Keep files hidden until "Go" is clicked
-    }, 500)
   }
 
   const handleRemoveFile = () => {
+    setFile(null)
     setFileName(null)
     setGithubLink('')
     setFiles([])
@@ -150,7 +158,7 @@ const FileFetcher: React.FC<FileFetecherProps> = ({
             <button 
               type="submit"
               className="absolute right-1 top-1/2 -translate-y-1/2 bg-blue-600 text-white px-5 py-2 rounded-full hover:bg-blue-700 transition-colors"
-              disabled={!githubLink}
+              disabled={!githubLink && !file}
             >
               Go
             </button>
@@ -175,8 +183,6 @@ const FileFetcher: React.FC<FileFetecherProps> = ({
               >
                 <path d="M21 8v13H3V8"></path>
                 <path d="M1 3h22v5H1z"></path>
-                <path d="M10 12v9"></path>
-                <path d="M14 12v9"></path>
               </svg>
               <span className="font-medium text-sm">{fileName}</span>
             </div>
