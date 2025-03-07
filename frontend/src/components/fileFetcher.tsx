@@ -11,12 +11,13 @@ const FileFetcher: React.FC<FileFetecherProps> = ({
   setGithubLink,
   onSubmit
 }) => {
-  const [selectedFolder, setSelectedFolder] = useState<string | null>(null)
   const [files, setFiles] = useState<string[]>([])
   const [showFiles, setShowFiles] = useState(false)
   const [extensions, setExtensions] = useState<string[]>([])
   const [selectedExtensions, setSelectedExtensions] = useState<string[]>([])
   const [filteredFiles, setFilteredFiles] = useState<string[]>([])
+  const [isDragging, setIsDragging] = useState(false)
+  const [fileName, setFileName] = useState<string | null>(null)
 
   // Extract extensions from file list
   useEffect(() => {
@@ -28,7 +29,6 @@ const FileFetcher: React.FC<FileFetecherProps> = ({
         })
         .filter((ext): ext is string => ext !== null)
         
-      // Get unique extensions
       const uniqueExts = Array.from(new Set(exts)).sort()
       setExtensions(uniqueExts)
     }
@@ -55,7 +55,6 @@ const FileFetcher: React.FC<FileFetecherProps> = ({
     e.preventDefault()
     onSubmit(e)
     
-    // Simulate getting file list from backend
     setTimeout(() => {
       const mockFiles = [
         'index.js', 'styles.css', 'components/Header.jsx', 'utils/helpers.ts', 'README.md',
@@ -63,10 +62,9 @@ const FileFetcher: React.FC<FileFetecherProps> = ({
         'tsconfig.json', 'next.config.js', 'app/layout.tsx', 'app/page.tsx'
       ]
       setFiles(mockFiles)
-      setFilteredFiles(mockFiles) // Initialize filtered files with all files
-      setSelectedFolder(githubLink.split('/').pop() || 'Repository')
+      setFilteredFiles(mockFiles)
       setShowFiles(true)
-      setSelectedExtensions([]) // Reset selected extensions
+      setSelectedExtensions([])
     }, 500)
   }
 
@@ -78,8 +76,49 @@ const FileFetcher: React.FC<FileFetecherProps> = ({
     )
   }
 
-  const removeFolder = () => {
-    setSelectedFolder(null)
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(false)
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(false)
+    
+    const droppedFiles = e.dataTransfer.files
+    if (droppedFiles.length > 0) {
+      const file = droppedFiles[0]
+      if (file.type === 'application/zip' || file.type === 'application/x-zip-compressed') {
+        handleZipFile(file)
+      } else {
+        alert('Please drop a ZIP file')
+      }
+    }
+  }
+
+  const handleZipFile = (file: File) => {
+    setFileName(file.name)
+    setGithubLink(`${file.name} (Uploaded ZIP file)`)
+    
+    setTimeout(() => {
+      const mockZipFiles = [
+        'main.js', 'style.css', 'index.html', 'assets/image.png', 'assets/logo.svg',
+        'lib/util.js', 'lib/helper.ts', 'data.json', 'README.md'
+      ]
+      setFiles(mockZipFiles)
+      setFilteredFiles(mockZipFiles)
+      setShowFiles(true)
+      setSelectedExtensions([])
+    }, 500)
+  }
+
+  const handleRemoveFile = () => {
+    setFileName(null)
     setGithubLink('')
     setFiles([])
     setFilteredFiles([])
@@ -90,64 +129,78 @@ const FileFetcher: React.FC<FileFetecherProps> = ({
 
   return (
     <div className="w-full">
-      {selectedFolder && (
-        <div className="mb-4 flex items-center bg-gray-100 rounded-lg p-3 animate-fadeIn">
-          <div className="flex items-center">
-            <svg
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#3b45ce"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="mr-2"
+      <div
+        className={`w-full max-w-4xl mx-auto rounded-lg p-2 ${
+          isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300'
+        } transition-colors`}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
+        <form onSubmit={handleFormSubmit} className="w-full">
+          <div className="relative flex">
+            <input 
+              type="text" 
+              placeholder="Enter GitHub link or drag and drop a ZIP file" 
+              value={githubLink}
+              onChange={(e) => setGithubLink(e.target.value)}
+              className="w-full px-4 py-3 pr-24 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
+            />
+            <button 
+              type="submit"
+              className="absolute right-1 top-1/2 -translate-y-1/2 bg-blue-600 text-white px-5 py-2 rounded-full hover:bg-blue-700 transition-colors"
+              disabled={!githubLink}
             >
-              <path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2z"></path>
-            </svg>
-            <span className="font-medium">{selectedFolder}</span>
+              Go
+            </button>
           </div>
-          <button 
-            onClick={removeFolder} 
-            className="ml-2 rounded-full p-1 hover:bg-gray-200"
-            aria-label="Remove folder"
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+        </form>
+      </div>
+      
+      {fileName && (
+        <div className="mt-3 w-full max-w-4xl mx-auto">
+          <div className="flex items-center justify-between p-2 bg-blue-50 rounded-lg border border-blue-200">
+            <div className="flex items-center">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#3b45ce"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="mr-2"
+              >
+                <path d="M21 8v13H3V8"></path>
+                <path d="M1 3h22v5H1z"></path>
+                <path d="M10 12v9"></path>
+                <path d="M14 12v9"></path>
+              </svg>
+              <span className="font-medium text-sm">{fileName}</span>
+            </div>
+            <button
+              onClick={handleRemoveFile}
+              className="text-gray-500 hover:text-gray-700 transition-colors"
+              title="Remove file"
             >
-              <line x1="18" y1="6" x2="6" y2="18"></line>
-              <line x1="6" y1="6" x2="18" y2="18"></line>
-            </svg>
-          </button>
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M18 6 6 18" />
+                <path d="m6 6 12 12" />
+              </svg>
+            </button>
+          </div>
         </div>
       )}
-
-      <form onSubmit={handleFormSubmit} className="w-full max-w-4xl mx-auto">
-        <div className="relative flex">
-          <input 
-            type="text" 
-            placeholder="Enter GitHub link or folder path" 
-            value={githubLink}
-            onChange={(e) => setGithubLink(e.target.value)}
-            className="w-full px-4 py-3 pr-24 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
-          />
-          <button 
-            type="submit"
-            className="absolute right-1 top-1/2 -translate-y-1/2 bg-blue-600 text-white px-5 py-2 rounded-full hover:bg-blue-700 transition-colors"
-            disabled={!githubLink}
-          >
-            Go
-          </button>
-        </div>
-      </form>
 
       {showFiles && extensions.length > 0 && (
         <div className="mt-4 flex flex-wrap gap-2 animate-fadeIn w-full max-w-4xl mx-auto">
