@@ -9,13 +9,14 @@ export default function Home() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     console.log('Submitted:', githubLink)
+    // Here you would make your API call to the backend
+    // to fetch the file list based on the githubLink
   }
 
   return (
     <main className="flex flex-col items-center justify-center min-h-screen bg-white">
       <div className="text-center w-full max-w-2xl px-4">
         <div className="flex items-center justify-center mb-10">
-          {/* 수정된 SVG */}
           <svg
             width="40"
             height="40"
