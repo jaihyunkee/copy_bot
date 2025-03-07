@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import GitHubUploader from '@/components/GitHubUploader'
+import FileFetcher from '@/components/fileFetcher'
 
 export default function Home() {
   const [githubLink, setGithubLink] = useState<string>('')
@@ -38,7 +38,7 @@ export default function Home() {
           <h1 className="text-4xl font-bold text-blue-600">Copy Bot</h1>
         </div>
         
-        <GitHubUploader 
+        <FileFetcher 
           githubLink={githubLink}
           setGithubLink={(value) => setGithubLink(value)}
           onSubmit={(e) => handleSubmit(e)}

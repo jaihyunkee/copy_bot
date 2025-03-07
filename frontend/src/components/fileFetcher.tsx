@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react'
 
-interface GitHubUploaderProps {
+interface FileFetecherProps {
   githubLink: string
   setGithubLink: (link: string) => void
   onSubmit: (e: React.FormEvent) => void
 }
 
-const GitHubUploader: React.FC<GitHubUploaderProps> = ({
+const FileFetcher: React.FC<FileFetecherProps> = ({
   githubLink,
   setGithubLink,
   onSubmit
@@ -235,4 +235,4 @@ const GitHubUploader: React.FC<GitHubUploaderProps> = ({
   )
 }
 
-export default GitHubUploader
+export default FileFetcher
