@@ -172,9 +172,18 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
   const getDisplayPath = (filePath: string) => {
     const pathParts = filePath.split('/')
     const fileName = pathParts[pathParts.length - 1]
-    if (pathParts.length <= 3) {
+    
+    // 경로가 1단계일 경우 (파일명만 있는 경우)
+    if (pathParts.length === 1) {
       return fileName
     }
+    
+    // 경로가 2단계일 경우 (최상위/파일명)
+    if (pathParts.length === 2) {
+      return `${pathParts[0]}/${fileName}`
+    }
+    
+    // 3단계 이상일 경우 (최상위/.../최하위/파일명)
     const topFolder = pathParts[0]
     const bottomFolder = pathParts[pathParts.length - 2]
     return `${topFolder}/.../${bottomFolder}/${fileName}`
