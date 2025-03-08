@@ -34,8 +34,11 @@ def list_files_and_get_size(folder_path: str):
     base_len = len(folder_path.rstrip(os.sep)) + 1
 
     for root, dirs, files in os.walk(folder_path):
-        # 숨김 폴더 제외
-        dirs[:] = [d for d in dirs if not d.startswith(".")]
+        # 숨김 폴더 및 'cache'가 포함된 폴더 제외
+        dirs[:] = [
+            d for d in dirs
+            if not d.startswith(".") and "cache" not in d.lower()
+        ]
 
         for f in files:
             # 숨김 파일 제외
@@ -150,7 +153,7 @@ def merge_codes(
     folder_path = SESSION_MAP.get(session_id)
     if not folder_path or not os.path.exists(folder_path):
         return PlainTextResponse("Invalid or expired session_id", status_code=400)
-
+    print(f"folder_path: {folder_path}")
     combined_text = ""
     for rel_path in file_path:
         real_path = os.path.join(folder_path, rel_path)
@@ -162,7 +165,7 @@ def merge_codes(
 
         content = None
         error_messages = []  # 인코딩 에러 메시지 추적
-
+        print(f'Processing {real_path}')
         # 1) UTF-8 시도
         try:
             with open(real_path, 'r', encoding='utf-8') as f:
