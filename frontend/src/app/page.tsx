@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import FileFetcher from '@/components/fileFetcher'
-import Image from 'next/image'
 
 export default function Home() {
   const [githubLink, setGithubLink] = useState<string>('')
@@ -11,13 +10,14 @@ export default function Home() {
     <main className="flex flex-col items-center justify-center min-h-screen bg-white">
       <div className="text-center w-full max-w-2xl px-4">
         <div className="flex items-center justify-center mb-10">
-          {/* 로고 */}
+          {/* 간단한 로고/타이틀 */}
           <svg
             version="1.1"
             width="64"
             height="64"
             viewBox="0 0 64 64"
             xmlns="http://www.w3.org/2000/svg"
+            className="mr-4"
           >
             <path
               d="M24 16 L16 24 L24 32 L16 40 L24 48"
@@ -55,12 +55,8 @@ export default function Home() {
             />
           </svg>
 
-          {/* CoPT 텍스트 디자인 */}
-          <h1 className="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-purple-600">
-            <span className="font-extrabold tracking-tight">C</span>
-            <span className="font-extrabold tracking-tight">o</span>
-            <span className="font-extrabold tracking-tight">P</span>
-            <span className="font-extrabold tracking-tight">T</span>
+          <h1 className="text-5xl font-bold text-blue-500">
+            CoPyT
           </h1>
         </div>
         

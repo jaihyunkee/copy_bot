@@ -10,7 +10,7 @@ from flask_cors import CORS
 app = Flask(__name__)
 CORS(app)
 
-SESSION_MAP = {}  # { session_id: "/path/to/user_clone/<session_id>" }
+SESSION_MAP = {}  # { session_id: "/absolute/path/to/user_clone/<session_id>" }
 MAX_FOLDER_SIZE = 500 * 1024 * 1024  # 500MB in bytes
 
 def parse_github_link(github_link: str):
@@ -31,7 +31,6 @@ def parse_github_link(github_link: str):
             repo = parts[-1]
             if owner and repo:
                 return owner, repo
-
     return None
 
 def is_valid_github_repo(github_link: str) -> bool:
@@ -55,7 +54,7 @@ def unzip_file(zip_file_path, dest_folder):
 
 def get_folder_size(folder_path: str) -> int:
     """
-    folder_path 내부의 모든 파일 사이즈 합을 바이트 단위로 반환
+    Returns total size of all files in folder_path (in bytes).
     """
     total_size = 0
     for root, dirs, files in os.walk(folder_path):
@@ -70,22 +69,40 @@ def list_all_files_in_folder(folder_path):
     base_len = len(folder_path.rstrip(os.sep)) + 1
 
     for root, dirs, files in os.walk(folder_path):
+        # Skip hidden folders
         dirs[:] = [d for d in dirs if not d.startswith(".")]
         for f in files:
+            # Skip hidden files
             if f.startswith("."):
                 continue
             full_path = os.path.join(root, f)
             relative_path = full_path[base_len:]
             file_list.append(relative_path)
-
     return file_list
 
 @app.route('/go', methods=['POST'])
 def go():
-    session_id = str(uuid.uuid4())
+    """
+    Creates or reuses a session for uploading either a ZIP file or GitHub link.
+    If a session_id is provided, the old folder is deleted and replaced.
+    If no session_id is provided, a new one is created.
+    """
+    existing_session_id = request.form.get('session_id')
 
     base_clone_dir = os.path.join(os.getcwd(), "user_clone")
     os.makedirs(base_clone_dir, exist_ok=True)
+
+    # If we have an existing session and it's valid, remove its folder
+    if existing_session_id and existing_session_id in SESSION_MAP:
+        old_folder = SESSION_MAP.pop(existing_session_id, None)
+        if old_folder and os.path.exists(old_folder):
+            shutil.rmtree(old_folder, ignore_errors=True)
+        session_id = existing_session_id
+    else:
+        # Otherwise, generate a new session
+        session_id = str(uuid.uuid4())
+
+    # Create new folder
     folder_path = os.path.join(base_clone_dir, session_id)
     os.makedirs(folder_path)
 
@@ -93,20 +110,8 @@ def go():
         github_link = request.form.get('githubLink')
         uploaded_file = request.files.get('file')
 
-        if github_link:
-            # 깃헙 유효성 체크
-            if not is_valid_github_repo(github_link):
-                shutil.rmtree(folder_path, ignore_errors=True)
-                return jsonify({"error": "Invalid GitHub repository URL"}), 400
-
-            # clone
-            try:
-                clone_github_repo(github_link, folder_path)
-            except subprocess.CalledProcessError as e:
-                shutil.rmtree(folder_path, ignore_errors=True)
-                return jsonify({"error": f"Git clone failed: {str(e)}"}), 400
-
-        elif uploaded_file:
+        if uploaded_file:
+            # User uploaded a ZIP file
             if not uploaded_file.filename.endswith('.zip'):
                 shutil.rmtree(folder_path, ignore_errors=True)
                 return jsonify({"error": "파일 확장자가 .zip 이 아닙니다."}), 400
@@ -119,21 +124,36 @@ def go():
             except zipfile.BadZipFile:
                 shutil.rmtree(folder_path, ignore_errors=True)
                 return jsonify({"error": "유효하지 않은 ZIP 파일입니다."}), 400
+
+        elif github_link:
+            # User provided a GitHub link
+            if not is_valid_github_repo(github_link):
+                shutil.rmtree(folder_path, ignore_errors=True)
+                return jsonify({"error": "Invalid GitHub repository URL"}), 400
+
+            try:
+                clone_github_repo(github_link, folder_path)
+            except subprocess.CalledProcessError as e:
+                shutil.rmtree(folder_path, ignore_errors=True)
+                return jsonify({"error": f"Git clone failed: {str(e)}"}), 400
         else:
+            # Neither file nor link was provided
             shutil.rmtree(folder_path, ignore_errors=True)
             return jsonify({"error": "githubLink 또는 file 둘 중 하나는 필수"}), 400
 
-        # 폴더 용량 체크
+        # Check folder size
         folder_size = get_folder_size(folder_path)
         if folder_size > MAX_FOLDER_SIZE:
             shutil.rmtree(folder_path, ignore_errors=True)
             return jsonify({"error": "프로젝트 폴더가 500MB를 초과합니다."}), 400
 
+        # List files
         file_list = list_all_files_in_folder(folder_path)
         if not file_list:
             shutil.rmtree(folder_path, ignore_errors=True)
             return jsonify({"error": "프로젝트에 숨김 파일 외에 표시할 파일이 없습니다."}), 400
 
+        # Map session_id -> folder path
         SESSION_MAP[session_id] = folder_path
 
         return jsonify({
@@ -147,6 +167,10 @@ def go():
 
 @app.route('/merge_codes', methods=['GET'])
 def merge_codes():
+    """
+    Merges the contents of selected files for the given session.
+    GET /merge_codes?session_id=...&file_path=...&file_path=...
+    """
     session_id = request.args.get('session_id')
     file_paths = request.args.getlist('file_path')
 
