@@ -8,6 +8,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 
 app = Flask(__name__)
+app.config['JSON_AS_ASCII'] = False  # 한글이 \uXXXX로 이스케이프되지 않도록
 CORS(app)
 
 SESSION_MAP = {}  # { session_id: "/absolute/path/to/user_clone/<session_id>" }
@@ -49,13 +50,24 @@ def clone_github_repo(github_link, dest_folder):
     subprocess.run(["git", "clone", github_link, dest_folder], check=True)
 
 def unzip_file(zip_file_path, dest_folder):
-    with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
-        zip_ref.extractall(dest_folder)
+    """
+    로컬에 설치된 'unzip' 명령어를 사용해서 압축을 해제합니다.
+    만약 오류가 발생하면 zipfile.BadZipFile 예외를 일으켜
+    상위 로직에서 '유효하지 않은 ZIP' 처리와 동일하게 취급하게 합니다.
+    """
+    # unzip "파일경로" -d "폴더경로"
+    # 만약 euc-kr(또는 cp949) 인코딩으로 된 한글 파일명 복원이 필요하다면,
+    #   unzip -O cp949 "파일경로" -d "폴더경로"
+    # 처럼 -O 옵션을 줄 수도 있습니다.
+    
+    # os.system() 반환값은 exit code이므로, 0이 아니면 오류로 가정합니다.
+    command = f'unzip "{zip_file_path}" -d "{dest_folder}"'
+    ret = os.system(command)
+    if ret != 0:
+        # zipfile.BadZipFile로 변환해 상위에서 except 처리하게 함
+        raise zipfile.BadZipFile(f"unzip command failed with exit code {ret}")
 
 def get_folder_size(folder_path: str) -> int:
-    """
-    Returns total size of all files in folder_path (in bytes).
-    """
     total_size = 0
     for root, dirs, files in os.walk(folder_path):
         for f in files:
@@ -69,10 +81,10 @@ def list_all_files_in_folder(folder_path):
     base_len = len(folder_path.rstrip(os.sep)) + 1
 
     for root, dirs, files in os.walk(folder_path):
-        # Skip hidden folders
+        # 숨김 폴더 건너뛰기
         dirs[:] = [d for d in dirs if not d.startswith(".")]
         for f in files:
-            # Skip hidden files
+            # 숨김 파일 건너뛰기
             if f.startswith("."):
                 continue
             full_path = os.path.join(root, f)
@@ -92,17 +104,15 @@ def go():
     base_clone_dir = os.path.join(os.getcwd(), "user_clone")
     os.makedirs(base_clone_dir, exist_ok=True)
 
-    # If we have an existing session and it's valid, remove its folder
+    # 기존 세션 폴더가 있으면 정리
     if existing_session_id and existing_session_id in SESSION_MAP:
         old_folder = SESSION_MAP.pop(existing_session_id, None)
         if old_folder and os.path.exists(old_folder):
             shutil.rmtree(old_folder, ignore_errors=True)
         session_id = existing_session_id
     else:
-        # Otherwise, generate a new session
         session_id = str(uuid.uuid4())
 
-    # Create new folder
     folder_path = os.path.join(base_clone_dir, session_id)
     os.makedirs(folder_path)
 
@@ -110,8 +120,8 @@ def go():
         github_link = request.form.get('githubLink')
         uploaded_file = request.files.get('file')
 
+        # ZIP 파일 업로드 처리
         if uploaded_file:
-            # User uploaded a ZIP file
             if not uploaded_file.filename.endswith('.zip'):
                 shutil.rmtree(folder_path, ignore_errors=True)
                 return jsonify({"error": "파일 확장자가 .zip 이 아닙니다."}), 400
@@ -120,13 +130,14 @@ def go():
             uploaded_file.save(zip_path)
 
             try:
+                # os.system("unzip ...") 방식
                 unzip_file(zip_path, folder_path)
             except zipfile.BadZipFile:
                 shutil.rmtree(folder_path, ignore_errors=True)
                 return jsonify({"error": "유효하지 않은 ZIP 파일입니다."}), 400
 
+        # GitHub URL로부터 클론 처리
         elif github_link:
-            # User provided a GitHub link
             if not is_valid_github_repo(github_link):
                 shutil.rmtree(folder_path, ignore_errors=True)
                 return jsonify({"error": "Invalid GitHub repository URL"}), 400
@@ -137,23 +148,22 @@ def go():
                 shutil.rmtree(folder_path, ignore_errors=True)
                 return jsonify({"error": f"Git clone failed: {str(e)}"}), 400
         else:
-            # Neither file nor link was provided
             shutil.rmtree(folder_path, ignore_errors=True)
             return jsonify({"error": "githubLink 또는 file 둘 중 하나는 필수"}), 400
 
-        # Check folder size
+        # 폴더 사이즈 체크
         folder_size = get_folder_size(folder_path)
         if folder_size > MAX_FOLDER_SIZE:
             shutil.rmtree(folder_path, ignore_errors=True)
             return jsonify({"error": "프로젝트 폴더가 500MB를 초과합니다."}), 400
 
-        # List files
+        # 파일 리스트 추출
         file_list = list_all_files_in_folder(folder_path)
         if not file_list:
             shutil.rmtree(folder_path, ignore_errors=True)
             return jsonify({"error": "프로젝트에 숨김 파일 외에 표시할 파일이 없습니다."}), 400
 
-        # Map session_id -> folder path
+        # 세션 맵핑
         SESSION_MAP[session_id] = folder_path
 
         return jsonify({
