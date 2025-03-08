@@ -57,6 +57,30 @@ body {
   }
 }
 
+.resize-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  background: #ccc;
+  cursor: ew-resize;
+}
+
+.files-container {
+  position: relative;
+}
+
+.files-container::before {
+  content: '';
+  position: absolute;
+  left: -5px;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  background: #ccc;
+  cursor: ew-resize;
+}
+
 /* Sticky Navigation Animation */
 @keyframes slideRight {
   from {

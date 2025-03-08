@@ -24,6 +24,7 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
   const [isGoLoading, setIsGoLoading] = useState(false);
   const [isMergeLoading, setIsMergeLoading] = useState(false);
   const filesContainerRef = useRef<HTMLDivElement>(null);
+  const selectedFilesContainerRef = useRef<HTMLDivElement>(null);
   const mergedCodeRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -235,9 +236,44 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
       .catch(err => console.error('Failed to copy:', err));
   };
 
+  // Merged Code 컨테이너를 가운데 정렬하는 함수
+  const centerMergedCodeContainer = () => {
+    if (mergedCodeRef.current) {
+      const container = mergedCodeRef.current.querySelector('.resizable-container') as HTMLElement;
+      if (container) {
+        const parentWidth = window.innerWidth;
+        const containerWidth = container.offsetWidth;
+        const leftOffset = (parentWidth - containerWidth) / 2;
+        container.style.left = `${leftOffset}px`;
+      }
+    }
+  };
+
+  useEffect(() => {
+    const handleMouseUp = () => {
+      centerMergedCodeContainer();
+    };
+
+    const handleResize = () => {
+      centerMergedCodeContainer();
+    };
+
+    if (mergedCodeRef.current) {
+      mergedCodeRef.current.addEventListener('mouseup', handleMouseUp);
+      const observer = new ResizeObserver(handleResize);
+      observer.observe(mergedCodeRef.current);
+      // 초기 정렬
+      centerMergedCodeContainer();
+      return () => {
+        mergedCodeRef.current?.removeEventListener('mouseup', handleMouseUp);
+        observer.disconnect();
+      };
+    }
+  }, [mergedCode]);
+
   return (
     <div className="w-full flex flex-col items-center">
-      {/* ZIP 파일 이름과 X 버튼을 input 위로 이동 */}
+      {/* ZIP 파일 이름과 X 버튼 */}
       {fileName && (
         <div className="mb-3 w-full max-w-[800px] mx-auto">
           <div className="flex items-center justify-between p-2 bg-blue-50 rounded-lg border border-blue-200">
@@ -385,126 +421,157 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
       )}
 
       {showFiles && (
-        <div className="w-full flex justify-center mt-4 relative" ref={filesContainerRef}>
-          <div className="w-full max-w-[800px] mx-auto relative">
-            <div className="w-full">
-              <div className="bg-white rounded-lg border border-gray-200 p-4 animate-slideUp w-full h-[500px] overflow-y-auto">
-                <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-lg font-semibold">Files</h2>
-                  {selectedExtensions.length > 0 && (
-                    <div className="text-xs text-gray-500">
-                      Filtered by: {selectedExtensions.join(', ')}
-                    </div>
-                  )}
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                  {filteredFiles.map((file, index) => (
-                    <div
-                      key={index}
-                      className="animate-fadeIn"
-                      style={{ animationDelay: `${Math.min(index * 50, 1000)}ms` }}
+        <div
+          className="mt-4"
+          ref={filesContainerRef}
+          style={{
+            overflow: 'visible',
+            width: '100vw',
+            position: 'relative',
+            display: 'flex',
+            justifyContent: 'center',
+            flexWrap: 'nowrap',
+          }}
+        >
+          <div
+            className="bg-white rounded-lg border border-gray-200 p-4 animate-slideUp h-[500px] overflow-y-auto"
+            style={{
+              minWidth: '400px',
+              width: '800px',
+              maxWidth: 'none',
+              resize: 'horizontal',
+              overflow: 'auto',
+              marginRight: '16px',
+              direction: 'rtl',
+            }}
+          >
+            <div style={{ direction: 'ltr' }}>
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-lg font-semibold">Files</h2>
+                {selectedExtensions.length > 0 && (
+                  <div className="text-xs text-gray-500">
+                    Filtered by: {selectedExtensions.join(', ')}
+                  </div>
+                )}
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                {filteredFiles.map((file, index) => (
+                  <div
+                    key={index}
+                    className="animate-fadeIn"
+                    style={{ animationDelay: `${Math.min(index * 50, 1000)}ms` }}
+                  >
+                    <input
+                      type="checkbox"
+                      id={`file-${index}`}
+                      className="hidden peer"
+                      checked={selectedFiles.has(file)}
+                      onChange={() => toggleFileSelection(file)}
+                    />
+                    <label
+                      htmlFor={`file-${index}`}
+                      className="flex items-center p-2 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors peer-checked:border-blue-600 peer-checked:bg-blue-50 text-xs"
+                      title={file}
                     >
-                      <input
-                        type="checkbox"
-                        id={`file-${index}`}
-                        className="hidden peer"
-                        checked={selectedFiles.has(file)}
-                        onChange={() => toggleFileSelection(file)}
-                      />
-                      <label
-                        htmlFor={`file-${index}`}
-                        className="flex items-center p-2 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors peer-checked:border-blue-600 peer-checked:bg-blue-50 text-xs"
-                        title={file}
+                      <svg
+                        width="12"
+                        height="12"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#3b45ce"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="mr-1 flex-shrink-0"
                       >
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <path d="M14 2v4a2 2 0 0 0 2 2h4"></path>
+                      </svg>
+                      <span className="truncate flex-grow">{getDisplayPath(file)}</span>
+                      {selectedFiles.has(file) && (
                         <svg
                           width="12"
                           height="12"
                           viewBox="0 0 24 24"
                           fill="none"
-                          stroke="#3b45ce"
-                          strokeWidth="1.5"
+                          stroke="currentColor"
+                          strokeWidth="2"
                           strokeLinecap="round"
                           strokeLinejoin="round"
-                          className="mr-1 flex-shrink-0"
+                          className="text-blue-600 ml-1"
                         >
-                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                          <path d="M14 2v4a2 2 0 0 0 2 2h4"></path>
+                          <polyline points="20 6 9 17 4 12"></polyline>
                         </svg>
-                        <span className="truncate flex-grow">{getDisplayPath(file)}</span>
-                        {selectedFiles.has(file) && (
-                          <svg
-                            width="12"
-                            height="12"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            className="text-blue-600 ml-1"
-                          >
-                            <polyline points="20 6 9 17 4 12"></polyline>
-                          </svg>
-                        )}
-                      </label>
-                    </div>
-                  ))}
-                </div>
-                {filteredFiles.length === 0 && (
-                  <div className="text-center py-10 text-gray-500">
-                    No files match the selected filters
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="absolute top-0 left-[calc(100%+16px)] w-[200px] h-[500px] border border-gray-200 rounded-lg shadow-lg bg-white animate-slideRight flex flex-col">
-              <div className="p-3 border-b border-gray-200 bg-gray-50 rounded-t-lg">
-                <h3 className="font-semibold text-sm">Selected Files</h3>
-                <p className="text-xs text-gray-500 mt-1">
-                  {Array.from(selectedFiles).length} files
-                </p>
-              </div>
-              <div className="p-2 overflow-y-auto flex-grow">
-                {Array.from(selectedFiles).map((file, index) => (
-                  <div
-                    key={index}
-                    className="p-1 hover:bg-gray-100 rounded text-xs flex items-center animate-fadeIn"
-                    style={{ animationDelay: `${Math.min(index * 30, 500)}ms` }}
-                    title={file}
-                  >
-                    <svg
-                      width="12"
-                      height="12"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="#3b45ce"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className="mr-1 flex-shrink-0"
-                    >
-                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                      <path d="M14 2v4a2 2 0 0 0 2 2h4"></path>
-                    </svg>
-                    <span className="truncate">{getDisplayPath(file)}</span>
+                      )}
+                    </label>
                   </div>
                 ))}
-                {selectedFiles.size === 0 && (
-                  <div className="text-center py-5 text-gray-500 text-xs">
-                    No files selected
-                  </div>
-                )}
               </div>
-              <div className="p-2 border-t border-gray-200">
-                <button
-                  onClick={handleMergeAndCopy}
-                  className="w-full px-4 py-2 bg-white text-blue-600 rounded-lg text-sm font-medium border border-blue-600 hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 shadow-md hover:shadow-lg disabled:text-blue-300 disabled:border-blue-300 disabled:cursor-not-allowed cursor-pointer"
-                  disabled={selectedFiles.size === 0}
+              {filteredFiles.length === 0 && (
+                <div className="text-center py-10 text-gray-500">
+                  No files match the selected filters
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div
+            ref={selectedFilesContainerRef}
+            className="border border-gray-200 rounded-lg shadow-lg bg-white animate-slideRight flex flex-col"
+            style={{
+              width: '200px',
+              height: '500px',
+              minWidth: '150px',
+              maxWidth: 'none',
+              resize: 'horizontal',
+              overflow: 'auto',
+            }}
+          >
+            <div className="p-3 border-b border-gray-200 bg-gray-50 rounded-t-lg">
+              <h3 className="font-semibold text-sm">Selected Files</h3>
+              <p className="text-xs text-gray-500 mt-1">
+                {Array.from(selectedFiles).length} files
+              </p>
+            </div>
+            <div className="p-2 overflow-y-auto flex-grow">
+              {Array.from(selectedFiles).map((file, index) => (
+                <div
+                  key={index}
+                  className="p-1 hover:bg-gray-100 rounded text-xs flex items-center animate-fadeIn"
+                  style={{ animationDelay: `${Math.min(index * 30, 500)}ms` }}
+                  title={file}
                 >
-                  Merge & Copy
-                </button>
-              </div>
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#3b45ce"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="mr-1 flex-shrink-0"
+                  >
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <path d="M14 2v4a2 2 0 0 0 2 2h4"></path>
+                  </svg>
+                  <span className="truncate">{getDisplayPath(file)}</span>
+                </div>
+              ))}
+              {selectedFiles.size === 0 && (
+                <div className="text-center py-5 text-gray-500 text-xs">
+                  No files selected
+                </div>
+              )}
+            </div>
+            <div className="p-2 border-t border-gray-200">
+              <button
+                onClick={handleMergeAndCopy}
+                className="w-full px-4 py-2 bg-white text-blue-600 rounded-lg text-sm font-medium border border-blue-600 hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 shadow-md hover:shadow-lg disabled:text-blue-300 disabled:border-blue-300 disabled:cursor-not-allowed cursor-pointer"
+                disabled={selectedFiles.size === 0}
+              >
+                Merge & Copy
+              </button>
             </div>
           </div>
         </div>
@@ -521,8 +588,29 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
       )}
 
       {mergedCode && (
-        <div className="w-full max-w-[800px] mx-auto mt-6" ref={mergedCodeRef}>
-          <div className="bg-white rounded-lg border border-gray-200 p-4 animate-slideUp">
+        <div
+          className="mt-6"
+          ref={mergedCodeRef}
+          style={{
+            width: '100vw',
+            position: 'relative',
+            overflow: 'visible',
+          }}
+        >
+          <div
+            className="bg-white rounded-lg border border-gray-200 p-4 animate-slideUp resizable-container"
+            style={{
+              minWidth: '400px',
+              width: '800px',
+              maxWidth: 'none',
+              resize: 'horizontal',
+              overflow: 'auto',
+              position: 'absolute',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              transition: 'left 0.3s ease-in-out', // 부드러운 이동 효과 추가
+            }}
+          >
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-semibold">Merged Code</h2>
               <button
@@ -541,7 +629,7 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
                     strokeLinecap="round"
                     strokeLinejoin="round"
                   >
-                    <polyline points="20 6 9 17 4 12"></polyline>
+                    <polyline points="20 6 917 4 12"></polyline>
                   </svg>
                 ) : (
                   <svg
