@@ -1,116 +1,67 @@
 import os
 import shutil
 import subprocess
-import zipfile
 import uuid
-import requests
-from flask import Flask, request, jsonify
+import json
+from flask import Flask, request, make_response
 from flask_cors import CORS
 
 app = Flask(__name__)
-app.config['JSON_AS_ASCII'] = False  # 한글이 \uXXXX로 이스케이프되지 않도록
 CORS(app)
 
 SESSION_MAP = {}  # { session_id: "/absolute/path/to/user_clone/<session_id>" }
 MAX_FOLDER_SIZE = 500 * 1024 * 1024  # 500MB in bytes
 
-def parse_github_link(github_link: str):
-    link = github_link.strip().rstrip('/').replace('.git', '')
-
-    if link.startswith("git@github.com:"):
-        part = link.replace("git@github.com:", "")
-        if '/' in part:
-            owner, repo = part.split('/', 1)
-            if owner and repo:
-                return owner, repo
-        return None
-
-    if "github.com" in link:
-        parts = link.split('/')
-        if len(parts) >= 5:
-            owner = parts[-2]
-            repo = parts[-1]
-            if owner and repo:
-                return owner, repo
-    return None
-
-def is_valid_github_repo(github_link: str) -> bool:
-    parsed = parse_github_link(github_link)
-    if not parsed:
-        return False
-    owner, repo = parsed
-    api_url = f"https://api.github.com/repos/{owner}/{repo}"
-    try:
-        resp = requests.get(api_url, timeout=5)
-        return resp.status_code == 200
-    except:
-        return False
-
-def clone_github_repo(github_link, dest_folder):
-    subprocess.run(["git", "clone", github_link, dest_folder], check=True)
-
-def unzip_file(zip_file_path, dest_folder):
+def custom_jsonify(data, status=200):
     """
-    로컬에 설치된 'unzip' 명령어를 사용해서 압축을 해제합니다.
-    만약 오류가 발생하면 zipfile.BadZipFile 예외를 일으켜
-    상위 로직에서 '유효하지 않은 ZIP' 처리와 동일하게 취급하게 합니다.
+    Flask 기본 jsonify 대신, 한글을 이스케이프하지 않도록 ensure_ascii=False로 응답
     """
-    # unzip "파일경로" -d "폴더경로"
-    # 만약 euc-kr(또는 cp949) 인코딩으로 된 한글 파일명 복원이 필요하다면,
-    #   unzip -O cp949 "파일경로" -d "폴더경로"
-    # 처럼 -O 옵션을 줄 수도 있습니다.
-    
-    # os.system() 반환값은 exit code이므로, 0이 아니면 오류로 가정합니다.
-    command = f'unzip "{zip_file_path}" -d "{dest_folder}"'
-    ret = os.system(command)
-    if ret != 0:
-        # zipfile.BadZipFile로 변환해 상위에서 except 처리하게 함
-        raise zipfile.BadZipFile(f"unzip command failed with exit code {ret}")
+    resp = make_response(json.dumps(data, ensure_ascii=False), status)
+    resp.headers['Content-Type'] = 'application/json; charset=utf-8'
+    return resp
 
-def get_folder_size(folder_path: str) -> int:
-    total_size = 0
-    for root, dirs, files in os.walk(folder_path):
-        for f in files:
-            fp = os.path.join(root, f)
-            if os.path.isfile(fp):
-                total_size += os.path.getsize(fp)
-    return total_size
-
-def list_all_files_in_folder(folder_path):
+def list_files_and_get_size(folder_path: str):
+    """
+    한 번의 os.walk()를 통해,
+    - 숨김 폴더/파일을 제외한 모든 파일의 상대 경로 리스트
+    - 전체 폴더 사이즈(합계)를 반환합니다.
+    """
     file_list = []
+    total_size = 0
     base_len = len(folder_path.rstrip(os.sep)) + 1
 
     for root, dirs, files in os.walk(folder_path):
-        # 숨김 폴더 건너뛰기
+        # 숨김 폴더 제외
         dirs[:] = [d for d in dirs if not d.startswith(".")]
+
         for f in files:
-            # 숨김 파일 건너뛰기
+            # 숨김 파일 제외
             if f.startswith("."):
                 continue
             full_path = os.path.join(root, f)
+            if os.path.isfile(full_path):
+                total_size += os.path.getsize(full_path)
+
             relative_path = full_path[base_len:]
             file_list.append(relative_path)
-    return file_list
+
+    return file_list, total_size
 
 @app.route('/go', methods=['POST'])
 def go():
-    """
-    Creates or reuses a session for uploading either a ZIP file or GitHub link.
-    If a session_id is provided, the old folder is deleted and replaced.
-    If no session_id is provided, a new one is created.
-    """
     existing_session_id = request.form.get('session_id')
 
     base_clone_dir = os.path.join(os.getcwd(), "user_clone")
     os.makedirs(base_clone_dir, exist_ok=True)
 
-    # 기존 세션 폴더가 있으면 정리
+    # 기존 세션 폴더가 있으면 삭제
     if existing_session_id and existing_session_id in SESSION_MAP:
         old_folder = SESSION_MAP.pop(existing_session_id, None)
         if old_folder and os.path.exists(old_folder):
             shutil.rmtree(old_folder, ignore_errors=True)
         session_id = existing_session_id
     else:
+        # 새 세션
         session_id = str(uuid.uuid4())
 
     folder_path = os.path.join(base_clone_dir, session_id)
@@ -120,67 +71,69 @@ def go():
         github_link = request.form.get('githubLink')
         uploaded_file = request.files.get('file')
 
-        # ZIP 파일 업로드 처리
         if uploaded_file:
+            # ZIP 파일 로직
             if not uploaded_file.filename.endswith('.zip'):
                 shutil.rmtree(folder_path, ignore_errors=True)
-                return jsonify({"error": "파일 확장자가 .zip 이 아닙니다."}), 400
+                return custom_jsonify({"error": "파일 확장자가 .zip 이 아닙니다."}, 400)
 
             zip_path = os.path.join(folder_path, uploaded_file.filename)
             uploaded_file.save(zip_path)
 
+            # subprocess.run을 통한 unzip
             try:
-                # os.system("unzip ...") 방식
-                unzip_file(zip_path, folder_path)
-            except zipfile.BadZipFile:
-                shutil.rmtree(folder_path, ignore_errors=True)
-                return jsonify({"error": "유효하지 않은 ZIP 파일입니다."}), 400
-
-        # GitHub URL로부터 클론 처리
-        elif github_link:
-            if not is_valid_github_repo(github_link):
-                shutil.rmtree(folder_path, ignore_errors=True)
-                return jsonify({"error": "Invalid GitHub repository URL"}), 400
-
-            try:
-                clone_github_repo(github_link, folder_path)
+                subprocess.run(["unzip", zip_path, "-d", folder_path], check=True)
             except subprocess.CalledProcessError as e:
                 shutil.rmtree(folder_path, ignore_errors=True)
-                return jsonify({"error": f"Git clone failed: {str(e)}"}), 400
+                return custom_jsonify({"error": f"unzip 명령어 실패: {e}"}, 400)
+            except FileNotFoundError:
+                # 시스템에 unzip 명령어가 없을 때 발생
+                shutil.rmtree(folder_path, ignore_errors=True)
+                return custom_jsonify({"error": "unzip 명령어를 찾을 수 없습니다. (시스템에 unzip이 설치되어 있는지 확인하세요)"}, 400)
+
+        elif github_link:
+            # GitHub repo 로직 (깊이 1로 클론)
+            try:
+                subprocess.run(["git", "clone", "--depth=1", github_link, folder_path], check=True)
+            except subprocess.CalledProcessError as e:
+                shutil.rmtree(folder_path, ignore_errors=True)
+                return custom_jsonify({"error": f"Git clone failed: {str(e)}"}, 400)
+
+            # 클론 후 .git 폴더 제거
+            git_folder = os.path.join(folder_path, ".git")
+            if os.path.exists(git_folder):
+                shutil.rmtree(git_folder, ignore_errors=True)
         else:
             shutil.rmtree(folder_path, ignore_errors=True)
-            return jsonify({"error": "githubLink 또는 file 둘 중 하나는 필수"}), 400
+            return custom_jsonify({"error": "githubLink 또는 file 둘 중 하나는 필수"}, 400)
 
-        # 폴더 사이즈 체크
-        folder_size = get_folder_size(folder_path)
+        # 파일 목록과 폴더 크기 계산 (os.walk() 한 번만 실행)
+        file_list, folder_size = list_files_and_get_size(folder_path)
+
+        # 폴더 용량 체크
         if folder_size > MAX_FOLDER_SIZE:
             shutil.rmtree(folder_path, ignore_errors=True)
-            return jsonify({"error": "프로젝트 폴더가 500MB를 초과합니다."}), 400
+            return custom_jsonify({"error": "프로젝트 폴더가 500MB를 초과합니다."}, 400)
 
-        # 파일 리스트 추출
-        file_list = list_all_files_in_folder(folder_path)
+        # 숨김 파일 제외 후 실제 보여줄 파일이 없는 경우
         if not file_list:
             shutil.rmtree(folder_path, ignore_errors=True)
-            return jsonify({"error": "프로젝트에 숨김 파일 외에 표시할 파일이 없습니다."}), 400
+            return custom_jsonify({"error": "프로젝트에 숨김 파일 외에 표시할 파일이 없습니다."}, 400)
 
-        # 세션 맵핑
+        # 세션 맵에 저장
         SESSION_MAP[session_id] = folder_path
 
-        return jsonify({
+        return custom_jsonify({
             "session_id": session_id,
             "file_paths": file_list
-        }), 200
+        }, 200)
 
     except Exception as e:
         shutil.rmtree(folder_path, ignore_errors=True)
-        return jsonify({"error": str(e)}), 500
+        return custom_jsonify({"error": str(e)}, 500)
 
 @app.route('/merge_codes', methods=['GET'])
 def merge_codes():
-    """
-    Merges the contents of selected files for the given session.
-    GET /merge_codes?session_id=...&file_path=...&file_path=...
-    """
     session_id = request.args.get('session_id')
     file_paths = request.args.getlist('file_path')
 
@@ -200,13 +153,16 @@ def merge_codes():
             combined_text += f"[{rel_path}]\n파일이 존재하지 않습니다.\n\n"
             continue
 
+        # UTF-8 시도 -> 실패 시 CP949 폴백
         try:
             with open(real_path, 'r', encoding='utf-8') as f:
                 content = f.read()
-            filename = os.path.basename(real_path)
-            combined_text += f"[{filename}]\n{content}\n\n"
-        except Exception as e:
-            combined_text += f"[{rel_path}]\n에러: {str(e)}\n\n"
+        except UnicodeDecodeError:
+            with open(real_path, 'r', encoding='cp949') as f:
+                content = f.read()
+
+        filename = os.path.basename(real_path)
+        combined_text += f"[{filename}]\n{content}\n\n"
 
     return combined_text, 200, {'Content-Type': 'text/plain; charset=utf-8'}
 
