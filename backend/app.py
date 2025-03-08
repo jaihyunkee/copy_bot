@@ -3,22 +3,25 @@ import shutil
 import subprocess
 import uuid
 import json
-from flask import Flask, request, make_response
-from flask_cors import CORS
 
-app = Flask(__name__)
-CORS(app)
+from fastapi import FastAPI, File, Form, UploadFile, Query
+from fastapi.responses import PlainTextResponse, JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+from typing import List, Optional
+
+app = FastAPI()
+
+# CORS 설정
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # 필요 시 특정 도메인으로 제한
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 SESSION_MAP = {}  # { session_id: "/absolute/path/to/user_clone/<session_id>" }
 MAX_FOLDER_SIZE = 500 * 1024 * 1024  # 500MB in bytes
-
-def custom_jsonify(data, status=200):
-    """
-    Flask 기본 jsonify 대신, 한글을 이스케이프하지 않도록 ensure_ascii=False로 응답
-    """
-    resp = make_response(json.dumps(data, ensure_ascii=False), status)
-    resp.headers['Content-Type'] = 'application/json; charset=utf-8'
-    return resp
 
 def list_files_and_get_size(folder_path: str):
     """
@@ -47,57 +50,57 @@ def list_files_and_get_size(folder_path: str):
 
     return file_list, total_size
 
-@app.route('/go', methods=['POST'])
-def go():
-    existing_session_id = request.form.get('session_id')
-
+@app.post("/go")
+def go(
+    session_id: Optional[str] = Form(None),
+    githubLink: Optional[str] = Form(None),
+    file: UploadFile = File(None)
+):
     base_clone_dir = os.path.join(os.getcwd(), "user_clone")
     os.makedirs(base_clone_dir, exist_ok=True)
 
     # 기존 세션 폴더가 있으면 삭제
-    if existing_session_id and existing_session_id in SESSION_MAP:
-        old_folder = SESSION_MAP.pop(existing_session_id, None)
+    if session_id and session_id in SESSION_MAP:
+        old_folder = SESSION_MAP.pop(session_id, None)
         if old_folder and os.path.exists(old_folder):
             shutil.rmtree(old_folder, ignore_errors=True)
-        session_id = existing_session_id
+        current_session_id = session_id
     else:
         # 새 세션
-        session_id = str(uuid.uuid4())
+        current_session_id = str(uuid.uuid4())
 
-    folder_path = os.path.join(base_clone_dir, session_id)
+    folder_path = os.path.join(base_clone_dir, current_session_id)
     os.makedirs(folder_path)
 
     try:
-        github_link = request.form.get('githubLink')
-        uploaded_file = request.files.get('file')
-
-        if uploaded_file:
+        if file:
             # ZIP 파일 로직
-            if not uploaded_file.filename.endswith('.zip'):
+            if not file.filename.endswith('.zip'):
                 shutil.rmtree(folder_path, ignore_errors=True)
-                return custom_jsonify({"error": "파일 확장자가 .zip 이 아닙니다."}, 400)
+                return JSONResponse({"error": "파일 확장자가 .zip 이 아닙니다."}, status_code=400)
 
-            zip_path = os.path.join(folder_path, uploaded_file.filename)
-            uploaded_file.save(zip_path)
+            zip_path = os.path.join(folder_path, file.filename)
+            with open(zip_path, "wb") as f_out:
+                shutil.copyfileobj(file.file, f_out)
 
             # subprocess.run을 통한 unzip
             try:
                 subprocess.run(["unzip", zip_path, "-d", folder_path], check=True)
             except subprocess.CalledProcessError as e:
                 shutil.rmtree(folder_path, ignore_errors=True)
-                return custom_jsonify({"error": f"unzip 명령어 실패: {e}"}, 400)
+                return JSONResponse({"error": f"unzip 명령어 실패: {e}"}, status_code=400)
             except FileNotFoundError:
                 # 시스템에 unzip 명령어가 없을 때 발생
                 shutil.rmtree(folder_path, ignore_errors=True)
-                return custom_jsonify({"error": "unzip 명령어를 찾을 수 없습니다. (시스템에 unzip이 설치되어 있는지 확인하세요)"}, 400)
+                return JSONResponse({"error": "unzip 명령어를 찾을 수 없습니다. (시스템에 unzip이 설치되어 있는지 확인하세요)"}, status_code=400)
 
-        elif github_link:
+        elif githubLink:
             # GitHub repo 로직 (깊이 1로 클론)
             try:
-                subprocess.run(["git", "clone", "--depth=1", github_link, folder_path], check=True)
+                subprocess.run(["git", "clone", "--depth=1", githubLink, folder_path], check=True)
             except subprocess.CalledProcessError as e:
                 shutil.rmtree(folder_path, ignore_errors=True)
-                return custom_jsonify({"error": f"Git clone failed: {str(e)}"}, 400)
+                return JSONResponse({"error": f"Git clone failed: {str(e)}"}, status_code=400)
 
             # 클론 후 .git 폴더 제거
             git_folder = os.path.join(folder_path, ".git")
@@ -105,66 +108,90 @@ def go():
                 shutil.rmtree(git_folder, ignore_errors=True)
         else:
             shutil.rmtree(folder_path, ignore_errors=True)
-            return custom_jsonify({"error": "githubLink 또는 file 둘 중 하나는 필수"}, 400)
+            return JSONResponse({"error": "githubLink 또는 file 둘 중 하나는 필수"}, status_code=400)
 
-        # 파일 목록과 폴더 크기 계산 (os.walk() 한 번만 실행)
+        # 파일 목록과 폴더 크기 계산
         file_list, folder_size = list_files_and_get_size(folder_path)
 
         # 폴더 용량 체크
         if folder_size > MAX_FOLDER_SIZE:
             shutil.rmtree(folder_path, ignore_errors=True)
-            return custom_jsonify({"error": "프로젝트 폴더가 500MB를 초과합니다."}, 400)
+            return JSONResponse({"error": "프로젝트 폴더가 500MB를 초과합니다."}, status_code=400)
 
         # 숨김 파일 제외 후 실제 보여줄 파일이 없는 경우
         if not file_list:
             shutil.rmtree(folder_path, ignore_errors=True)
-            return custom_jsonify({"error": "프로젝트에 숨김 파일 외에 표시할 파일이 없습니다."}, 400)
+            return JSONResponse({"error": "프로젝트에 숨김 파일 외에 표시할 파일이 없습니다."}, status_code=400)
 
         # 세션 맵에 저장
-        SESSION_MAP[session_id] = folder_path
+        SESSION_MAP[current_session_id] = folder_path
 
-        return custom_jsonify({
-            "session_id": session_id,
+        return JSONResponse({
+            "session_id": current_session_id,
             "file_paths": file_list
-        }, 200)
+        }, status_code=200)
 
     except Exception as e:
         shutil.rmtree(folder_path, ignore_errors=True)
-        return custom_jsonify({"error": str(e)}, 500)
+        return JSONResponse({"error": str(e)}, status_code=500)
 
-@app.route('/merge_codes', methods=['GET'])
-def merge_codes():
-    session_id = request.args.get('session_id')
-    file_paths = request.args.getlist('file_path')
-
-    if not session_id:
-        return "session_id is required", 400
-    if not file_paths:
-        return "At least one file_path is required", 400
+@app.get("/merge_codes", response_class=PlainTextResponse)
+def merge_codes(
+    session_id: str,
+    file_path: List[str] = Query(None)
+):
+    """
+    파일들을 순회하며, UTF-8로 먼저 읽고 실패하면 CP949로 재시도합니다.
+    둘 다 실패할 경우, 어느 파일에서 깨졌는지 에러 메시지를 합쳐 반환합니다.
+    """
+    if not file_path:
+        return PlainTextResponse("At least one file_path is required", status_code=400)
 
     folder_path = SESSION_MAP.get(session_id)
     if not folder_path or not os.path.exists(folder_path):
-        return "Invalid or expired session_id", 400
+        return PlainTextResponse("Invalid or expired session_id", status_code=400)
 
     combined_text = ""
-    for rel_path in file_paths:
+    for rel_path in file_path:
         real_path = os.path.join(folder_path, rel_path)
+        filename = os.path.basename(real_path)
+
         if not os.path.isfile(real_path):
             combined_text += f"[{rel_path}]\n파일이 존재하지 않습니다.\n\n"
             continue
 
-        # UTF-8 시도 -> 실패 시 CP949 폴백
+        content = None
+        error_messages = []  # 인코딩 에러 메시지 추적
+
+        # 1) UTF-8 시도
         try:
             with open(real_path, 'r', encoding='utf-8') as f:
                 content = f.read()
-        except UnicodeDecodeError:
-            with open(real_path, 'r', encoding='cp949') as f:
-                content = f.read()
+        except UnicodeDecodeError as e:
+            error_messages.append(f"UTF-8 디코딩 실패: {str(e)}")
 
-        filename = os.path.basename(real_path)
-        combined_text += f"[{filename}]\n{content}\n\n"
+        # 2) CP949 재시도
+        if content is None:
+            try:
+                with open(real_path, 'r', encoding='cp949') as f:
+                    content = f.read()
+            except UnicodeDecodeError as e:
+                error_messages.append(f"CP949 디코딩 실패: {str(e)}")
 
-    return combined_text, 200, {'Content-Type': 'text/plain; charset=utf-8'}
+        if content is None:
+            # 두 인코딩 모두 실패 → 어느 파일인지 + 에러 내용 표시
+            combined_text += (
+                f"[{filename}]\n"
+                f"인코딩 오류 발생 (UTF-8, CP949 모두 실패)\n"
+                f"에러 상세: {error_messages}\n\n"
+            )
+        else:
+            # 정상적으로 디코딩된 경우
+            combined_text += f"[{filename}]\n{content}\n\n"
 
-if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    return PlainTextResponse(content=combined_text, status_code=200)
+
+# uvicorn으로 서버 실행
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="127.0.0.1", port=5000)
