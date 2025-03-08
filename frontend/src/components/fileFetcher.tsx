@@ -19,9 +19,11 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
   const [filteredFiles, setFilteredFiles] = useState<string[]>([])
   const [isDragging, setIsDragging] = useState(false)
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set())
+  const [mergedCode, setMergedCode] = useState<string>('')
+  const [isCopied, setIsCopied] = useState(false) // New state for copy feedback
   const filesContainerRef = useRef<HTMLDivElement>(null)
+  const mergedCodeRef = useRef<HTMLDivElement>(null)
 
-  // 나머지 useEffect 및 함수들 (변경 없음)
   useEffect(() => {
     const handleScroll = () => {
       if (filesContainerRef.current) {
@@ -163,36 +165,82 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
     setExtensions([])
     setSelectedExtensions([])
     setSelectedFiles(new Set())
+    setMergedCode('')
+    setIsCopied(false)
   }
 
-  // 새로운 함수: 파일 경로를 표시에 적합하게 처리
   const getDisplayPath = (filePath: string) => {
     const pathParts = filePath.split('/')
-    
-    // 파일 이름 (마지막 부분)
     const fileName = pathParts[pathParts.length - 1]
-    
-    // 경로 길이가 3 이하면 그대로 반환
     if (pathParts.length <= 3) {
       return fileName
     }
-    
-    // 최상위 폴더와 최하위 폴더만 표시 (중간은 '...'로 대체)
     const topFolder = pathParts[0]
     const bottomFolder = pathParts[pathParts.length - 2]
-    
     return `${topFolder}/.../${bottomFolder}/${fileName}`
   }
 
-  // Merge & Copy 버튼 클릭 핸들러
-  const handleMergeAndCopy = () => {
-    console.log("Merge & Copy clicked! Selected files:", Array.from(selectedFiles))
-    // 여기에 실제 병합 및 복사 로직을 추가할 수 있습니다.
+  const handleMergeAndCopy = async () => {
+    if (!sessionId || selectedFiles.size === 0) {
+      alert("No session or files selected!")
+      return
+    }
+
+    const params = new URLSearchParams()
+    params.append('session_id', sessionId)
+    Array.from(selectedFiles).forEach(filePath => {
+      params.append('file_path', filePath)
+    })
+
+    try {
+      const response = await fetch(`http://127.0.0.1:5000/merge_codes?${params.toString()}`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'text/plain'
+        }
+      })
+
+      if (response.ok) {
+        const mergedResult = await response.text()
+        setMergedCode(mergedResult)
+        navigator.clipboard.writeText(mergedResult)
+          .then(() => {
+            console.log('Merged code copied to clipboard')
+            setIsCopied(true)
+            setTimeout(() => setIsCopied(false), 2000) // Revert after 2 seconds
+          })
+          .catch(err => console.error('Failed to copy:', err))
+        
+        setTimeout(() => {
+          if (mergedCodeRef.current) {
+            mergedCodeRef.current.scrollIntoView({ 
+              behavior: 'smooth',
+              block: 'start'
+            })
+          }
+        }, 100)
+      } else {
+        const errorText = await response.text()
+        console.error('Error from backend:', errorText)
+        alert("Failed to merge codes: " + errorText)
+      }
+    } catch (error) {
+      console.error('Error during merge_codes fetch:', error)
+      alert("An error occurred while fetching merged codes.")
+    }
+  }
+
+  const handleCopyClick = () => {
+    navigator.clipboard.writeText(mergedCode)
+      .then(() => {
+        setIsCopied(true)
+        setTimeout(() => setIsCopied(false), 2000) // Revert after 2 seconds
+      })
+      .catch(err => console.error('Failed to copy:', err))
   }
 
   return (
     <div className="w-full flex flex-col items-center">
-      {/* 입력 창 */}
       <div className="w-full flex justify-center">
         <div
           className={`w-full max-w-[800px] rounded-lg p-2 ${
@@ -216,7 +264,7 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
               />
               <button 
                 type="submit"
-                className="absolute right-1 top-1/2 -translate-y-1/2 bg-blue-600 text-white px-5 py-2 rounded-full hover:bg-blue-700 transition-colors"
+                className="absolute right-1 top-1/2 -translate-y-1/2 bg-blue-600 text-white px-5 py-2 rounded-full hover:bg-blue-700 transition-colors cursor-pointer"
                 disabled={!githubLink && !file}
               >
                 Go
@@ -226,7 +274,6 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
         </div>
       </div>
 
-      {/* 업로드된 파일 이름 표시 */}
       {fileName && (
         <div className="mt-3 w-full max-w-[800px] mx-auto">
           <div className="flex items-center justify-between p-2 bg-blue-50 rounded-lg border border-blue-200">
@@ -270,7 +317,6 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
         </div>
       )}
 
-      {/* 확장자 필터 */}
       {showFiles && extensions.length > 0 && (
         <div className="mt-4 flex flex-wrap gap-2 animate-fadeIn w-full max-w-[800px] mx-auto justify-center">
           {extensions.map((ext, index) => (
@@ -313,11 +359,9 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
         </div>
       )}
 
-      {/* 파일 선택 창 및 선택된 파일 컨테이너 */}
       {showFiles && (
         <div className="w-full flex justify-center mt-4 relative" ref={filesContainerRef}>
           <div className="w-full max-w-[800px] mx-auto relative">
-            {/* 파일 선택 창 */}
             <div className="w-full">
               <div className="bg-white rounded-lg border border-gray-200 p-4 animate-slideUp w-full h-[500px] overflow-y-auto">
                 <div className="flex justify-between items-center mb-4">
@@ -379,7 +423,6 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
               </div>
             </div>
 
-            {/* 선택된 파일 컨테이너와 Merge & Copy 버튼 */}
             <div className="absolute top-0 left-[calc(100%+16px)] w-[200px] h-[450px] border border-gray-200 rounded-lg shadow-lg bg-white animate-slideRight flex flex-col">
               <div className="p-3 border-b border-gray-200 bg-gray-50 rounded-t-lg">
                 <h3 className="font-semibold text-sm">Selected Files</h3>
@@ -418,17 +461,71 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
                   </div>
                 )}
               </div>
-              {/* Merge & Copy 버튼 - 하얀색 배경에 파란색 글자 */}
               <div className="p-2 border-t border-gray-200">
                 <button
                   onClick={handleMergeAndCopy}
-                  className="w-full px-4 py-2 bg-white text-blue-600 rounded-lg text-sm font-medium border border-blue-600 hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 shadow-md hover:shadow-lg disabled:text-blue-300 disabled:border-blue-300 disabled:cursor-not-allowed"
+                  className="w-full px-4 py-2 bg-white text-blue-600 rounded-lg text-sm font-medium border border-blue-600 hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 shadow-md hover:shadow-lg disabled:text-blue-300 disabled:border-blue-300 disabled:cursor-not-allowed cursor-pointer"
                   disabled={selectedFiles.size === 0}
                 >
                   Merge & Copy
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {mergedCode && (
+        <div className="w-full max-w-[800px] mx-auto mt-6" ref={mergedCodeRef}>
+          <div className="bg-white rounded-lg border border-gray-200 p-4 animate-slideUp">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold">Merged Code</h2>
+              <button
+                onClick={handleCopyClick}
+                className="text-blue-600 hover:text-blue-800 cursor-pointer"
+                title="Copy to clipboard"
+              >
+                {isCopied ? (
+                  <svg 
+                    width="16" 
+                    height="16" 
+                    viewBox="0 0 24 24" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    strokeWidth="2" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round"
+                  >
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                ) : (
+                  <svg 
+                    width="16" 
+                    height="16" 
+                    viewBox="0 0 24 24" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    strokeWidth="2" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round"
+                  >
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                  </svg>
+                )}
+              </button>
+            </div>
+            <div className="bg-gray-50 p-4 rounded-lg max-h-[600px] overflow-y-auto">
+              <pre className="text-sm text-left whitespace-pre-wrap break-words">
+                {mergedCode}
+              </pre>
+            </div>
+            <button
+              onClick={() => setMergedCode('')}
+              className="mt-4 text-sm text-red-600 hover:text-red-800"
+            >
+              Clear merged code
+            </button>
           </div>
         </div>
       )}
