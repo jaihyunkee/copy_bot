@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import FileFetcher from '@/components/fileFetcher'
-import Image from 'next/image' // Next.js에서 이미지를 사용하기 위해 import
+import Image from 'next/image'
 
 export default function Home() {
   const [githubLink, setGithubLink] = useState<string>('')
@@ -11,7 +11,7 @@ export default function Home() {
     <main className="flex flex-col items-center justify-center min-h-screen bg-white">
       <div className="text-center w-full max-w-2xl px-4">
         <div className="flex items-center justify-center mb-10">
-          {/* 로고 사이즈를 40x40에서 60x60으로 증가 */}
+          {/* 로고 */}
           <svg
             version="1.1"
             width="64"
@@ -55,11 +55,12 @@ export default function Home() {
             />
           </svg>
 
-          {/* C, P, T 크기를 text-5xl에서 text-[2.5rem]으로 조정 */}
-          <h1 className="text-4xl font-bold text-blue-600">
-            <span className="text-[2.5rem] font-extrabold">C</span>o
-            <span className="text-[2.5rem] font-extrabold">P</span>
-            <span className="text-[2.5rem] font-extrabold">T</span>
+          {/* CoPT 텍스트 디자인 */}
+          <h1 className="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-purple-600">
+            <span className="font-extrabold tracking-tight">C</span>
+            <span className="font-extrabold tracking-tight">o</span>
+            <span className="font-extrabold tracking-tight">P</span>
+            <span className="font-extrabold tracking-tight">T</span>
           </h1>
         </div>
         
