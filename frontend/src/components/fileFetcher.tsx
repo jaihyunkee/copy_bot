@@ -9,10 +9,14 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
   githubLink,
   setGithubLink,
 }) => {
+  const [sessionId, setSessionId] = useState<string>(() => {
+    // 마운트 시 localStorage에 session_id가 있으면 불러옴
+    const storedId = localStorage.getItem('session_id');
+    return storedId ? storedId : '';
+  });
   const [file, setFile] = useState<File | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   const [files, setFiles] = useState<string[]>([]);
-  const [sessionId, setSessionId] = useState<string>('');
   const [showFiles, setShowFiles] = useState(false);
   const [extensions, setExtensions] = useState<string[]>([]);
   const [selectedExtensions, setSelectedExtensions] = useState<string[]>([]);
@@ -23,10 +27,19 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
   const [isCopied, setIsCopied] = useState(false);
   const [isGoLoading, setIsGoLoading] = useState(false);
   const [isMergeLoading, setIsMergeLoading] = useState(false);
+
   const filesContainerRef = useRef<HTMLDivElement>(null);
   const selectedFilesContainerRef = useRef<HTMLDivElement>(null);
   const mergedCodeRef = useRef<HTMLDivElement>(null);
 
+  // sessionId 변경 시 localStorage에 저장
+  useEffect(() => {
+    if (sessionId) {
+      localStorage.setItem('session_id', sessionId);
+    }
+  }, [sessionId]);
+
+  // 스크롤 이벤트 예시 (디자인 용)
   useEffect(() => {
     const handleScroll = () => {
       if (filesContainerRef.current) {
@@ -37,6 +50,7 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // 파일 확장자 목록 수집
   useEffect(() => {
     if (files.length > 0) {
       const exts = files
@@ -50,6 +64,7 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
     }
   }, [files]);
 
+  // 확장자 필터 적용
   useEffect(() => {
     if (selectedExtensions.length === 0) {
       setFilteredFiles(files);
@@ -66,6 +81,7 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
     }
   }, [files, selectedExtensions]);
 
+  // 필터가 바뀌면 현재 화면에 표시된 파일들 모두 선택
   useEffect(() => {
     if (filteredFiles.length > 0) {
       setSelectedFiles(new Set(filteredFiles));
@@ -74,6 +90,9 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
     }
   }, [filteredFiles]);
 
+  // ==========================
+  // (1) /go 엔드포인트: ZIP 업로드 or GitHub Link
+  // ==========================
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!githubLink && !file) {
@@ -81,52 +100,56 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
       return;
     }
     setIsGoLoading(true);
+
     const formData = new FormData();
-    if (githubLink) formData.append('githubLink', githubLink);
-    if (file) formData.append('file', file);
+    // sessionId가 있으면 같이 전송
+    if (sessionId) {
+      formData.append('session_id', sessionId);
+    }
+    // githubLink와 file 둘 다 서버에 보냄
+    // (서버에서 우선순위 결정: githubLink > file)
+    if (githubLink) {
+      formData.append('githubLink', githubLink);
+    }
+    if (file) {
+      formData.append('file', file);
+    }
 
     try {
       const response = await fetch('http://127.0.0.1:5000/go', {
         method: 'POST',
         body: formData,
       });
+
+      // 가벼운 지연 (UI 애니메이션 효과용)
       await new Promise(resolve => setTimeout(resolve, 1500));
+
       if (response.ok) {
         const result = await response.json();
         console.log('Response from backend:', result);
-        setSessionId(result.session_id);
+
+        // 새 session_id가 있으면 갱신
+        if (result.session_id) {
+          setSessionId(result.session_id);
+        }
+
         setFiles(result.file_paths);
         setShowFiles(true);
         setSelectedExtensions([]);
       } else {
         const err = await response.json();
         console.error('Backend error:', err);
+        alert(`Error: ${err.error || 'Failed to process the request'}`);
       }
     } catch (error) {
       console.error('Error during fetch:', error);
+      alert("An error occurred while sending the request.");
     } finally {
       setIsGoLoading(false);
     }
   };
 
-  const toggleExtension = (ext: string) => {
-    setSelectedExtensions(prev =>
-      prev.includes(ext) ? prev.filter(e => e !== ext) : [...prev, ext]
-    );
-  };
-
-  const toggleFileSelection = (filePath: string) => {
-    setSelectedFiles(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(filePath)) {
-        newSet.delete(filePath);
-      } else {
-        newSet.add(filePath);
-      }
-      return newSet;
-    });
-  };
-
+  // (Drag & Drop) ZIP 파일 처리
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(true);
@@ -143,7 +166,10 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
     const droppedFiles = e.dataTransfer.files;
     if (droppedFiles.length > 0) {
       const droppedFile = droppedFiles[0];
-      if (droppedFile.type === 'application/zip' || droppedFile.type === 'application/x-zip-compressed') {
+      if (
+        droppedFile.type === 'application/zip' ||
+        droppedFile.type === 'application/x-zip-compressed'
+      ) {
         handleZipFile(droppedFile);
       } else {
         alert('Please drop a ZIP file');
@@ -154,9 +180,11 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
   const handleZipFile = (file: File) => {
     setFile(file);
     setFileName(file.name);
+    // githubLink 인풋에 표시하기 위한 임시값
     setGithubLink(`${file.name} (Uploaded ZIP file)`);
   };
 
+  // ZIP 파일 제거 (X 버튼)
   const handleRemoveFile = () => {
     setFile(null);
     setFileName(null);
@@ -171,6 +199,27 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
     setIsCopied(false);
   };
 
+  // 확장자 필터 토글
+  const toggleExtension = (ext: string) => {
+    setSelectedExtensions(prev =>
+      prev.includes(ext) ? prev.filter(e => e !== ext) : [...prev, ext]
+    );
+  };
+
+  // 개별 파일 선택 토글
+  const toggleFileSelection = (filePath: string) => {
+    setSelectedFiles(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(filePath)) {
+        newSet.delete(filePath);
+      } else {
+        newSet.add(filePath);
+      }
+      return newSet;
+    });
+  };
+
+  // 파일 표시이름 (경로 압축)
   const getDisplayPath = (filePath: string) => {
     const pathParts = filePath.split('/');
     const fileName = pathParts[pathParts.length - 1];
@@ -181,12 +230,16 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
     return `${topFolder}/.../${bottomFolder}/${fileName}`;
   };
 
+  // ==========================
+  // (2) /merge_codes: 선택된 파일들 합치기
+  // ==========================
   const handleMergeAndCopy = async () => {
     if (!sessionId || selectedFiles.size === 0) {
-      alert("No session or files selected!");
+      alert("No session or no files selected!");
       return;
     }
     setIsMergeLoading(true);
+
     const params = new URLSearchParams();
     params.append('session_id', sessionId);
     Array.from(selectedFiles).forEach(filePath => {
@@ -198,10 +251,15 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
         method: 'GET',
         headers: { 'Accept': 'text/plain' },
       });
+
+      // 가벼운 지연 (UI 애니메이션 효과용)
       await new Promise(resolve => setTimeout(resolve, 1500));
+
       if (response.ok) {
         const mergedResult = await response.text();
         setMergedCode(mergedResult);
+
+        // 복사
         navigator.clipboard.writeText(mergedResult)
           .then(() => {
             console.log('Merged code copied to clipboard');
@@ -209,6 +267,8 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
             setTimeout(() => setIsCopied(false), 2000);
           })
           .catch(err => console.error('Failed to copy:', err));
+
+        // 스크롤 이동
         setTimeout(() => {
           if (mergedCodeRef.current) {
             mergedCodeRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -227,6 +287,7 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
     }
   };
 
+  // Merged Code 수동 복사
   const handleCopyClick = () => {
     navigator.clipboard.writeText(mergedCode)
       .then(() => {
@@ -236,7 +297,7 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
       .catch(err => console.error('Failed to copy:', err));
   };
 
-  // Merged Code 컨테이너를 가운데 정렬하는 함수
+  // Merged Code가 위치/크기 변경 시, 가운데 정렬 유지
   const centerMergedCodeContainer = () => {
     if (mergedCodeRef.current) {
       const container = mergedCodeRef.current.querySelector('.resizable-container') as HTMLElement;
@@ -253,7 +314,6 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
     const handleMouseUp = () => {
       centerMergedCodeContainer();
     };
-
     const handleResize = () => {
       centerMergedCodeContainer();
     };
@@ -262,8 +322,10 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
       mergedCodeRef.current.addEventListener('mouseup', handleMouseUp);
       const observer = new ResizeObserver(handleResize);
       observer.observe(mergedCodeRef.current);
+
       // 초기 정렬
       centerMergedCodeContainer();
+
       return () => {
         mergedCodeRef.current?.removeEventListener('mouseup', handleMouseUp);
         observer.disconnect();
@@ -273,6 +335,7 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
 
   return (
     <div className="w-full flex flex-col items-center">
+      {/* (A) 입력 폼 영역 */}
       <div className="w-full flex justify-center">
         <div
           className={`w-full max-w-[800px] rounded-lg p-2 ${
@@ -283,14 +346,13 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
           onDrop={handleDrop}
         >
           <form onSubmit={handleFormSubmit} className="w-full flex justify-center">
-            {/* 인풋을 감싸는 컨테이너를 flex-col로 바꿔서, 파일 태그가 인풋 위로 */}
             <div
               className="relative flex flex-col w-full max-w-[800px] px-4 py-4 
                          border border-gray-300 rounded-4xl focus-within:ring-2 
                          focus-within:ring-blue-500 text-base transition-colors bg-white"
               style={{ minHeight: '3.5rem' }}
             >
-              {/* 파일명 태그 */}
+              {/* 업로드된 ZIP 파일 표시 */}
               {fileName && (
                 <div className="flex items-center self-start mb-2 bg-blue-50 border border-blue-200 rounded-lg px-2 py-1">
                   <span className="text-sm text-blue-600 font-medium">{fileName}</span>
@@ -317,23 +379,23 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
                 </div>
               )}
 
-              {/* 깃허브 링크 입력 + Go 버튼 */}
-              <div className="flex items-center">
+              {/* GitHub Link + Go 버튼 */}
+              <div className="flex">
                 <input
                   type="text"
-                  placeholder={fileName ? '' : 'Enter GitHub link or drag and drop a ZIP file'}
+                  placeholder="GitHub link or drag/drop a ZIP file"
                   value={githubLink}
                   onChange={(e) => setGithubLink(e.target.value)}
-                  className={`flex-grow focus:outline-none text-sm md:text-base ${
-                    isDragging ? 'bg-blue-100' : 'bg-white'
+                  className={`flex-grow border border-gray-300 rounded-l-xl px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                    isDragging ? 'bg-blue-50' : 'bg-white'
                   }`}
                 />
                 <button
                   type="submit"
-                  className="ml-2 bg-blue-600 text-white px-5 py-2 rounded-full hover:bg-blue-700 transition-colors cursor-pointer text-sm"
+                  className="px-4 py-2 text-sm bg-blue-600 text-white rounded-r-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                   disabled={!githubLink && !file}
                 >
-                  Go
+                  {isGoLoading ? 'Loading...' : 'Go'}
                 </button>
               </div>
             </div>
@@ -341,6 +403,7 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
         </div>
       </div>
 
+      {/* (B) 로딩 (Go) */}
       {isGoLoading && (
         <div className="mt-4 w-full max-w-[800px] mx-auto flex justify-center">
           <img
@@ -351,6 +414,7 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
         </div>
       )}
 
+      {/* (C) 확장자 필터 */}
       {showFiles && extensions.length > 0 && (
         <div className="mt-4 flex flex-wrap gap-2 animate-fadeIn w-full max-w-[800px] mx-auto justify-center">
           {extensions.map((ext, index) => (
@@ -411,6 +475,7 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
         </div>
       )}
 
+      {/* (D) 파일 리스트 & 선택된 파일 */}
       {showFiles && (
         <div
           className="mt-4"
@@ -424,6 +489,7 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
             flexWrap: 'nowrap',
           }}
         >
+          {/* 왼쪽: 파일 리스트 */}
           <div
             className="bg-white rounded-lg border border-gray-200 p-4 animate-slideUp h-[500px] overflow-y-auto"
             style={{
@@ -506,6 +572,7 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
             </div>
           </div>
 
+          {/* 오른쪽: 선택된 파일 */}
           <div
             ref={selectedFilesContainerRef}
             className="border border-gray-200 rounded-lg shadow-lg bg-white animate-slideRight flex flex-col"
@@ -568,6 +635,7 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
         </div>
       )}
 
+      {/* (E) 로딩 (Merge) */}
       {isMergeLoading && (
         <div className="mt-4 w-full max-w-[800px] mx-auto flex justify-center">
           <img
@@ -578,6 +646,7 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
         </div>
       )}
 
+      {/* (F) 병합 결과 */}
       {mergedCode && (
         <div
           className="mt-6"
