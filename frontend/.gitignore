@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+/user_clone
 /.pnp
 .pnp.*
 .yarn/*
