@@ -56,7 +56,7 @@ export default function Home() {
           </svg>
 
           <h1 className="text-5xl font-bold text-blue-500">
-            CoPyT
+            CoPT
           </h1>
         </div>
         
