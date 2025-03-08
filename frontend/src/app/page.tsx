@@ -55,7 +55,7 @@ export default function Home() {
             />
           </svg>
 
-          <h1 className="text-5xl font-bold text-blue-500">
+          <h1 className="text-5xl font-bold bg-gradient-to-r from-blue-500 to-indigo-600 bg-clip-text text-transparent">
             CoPT
           </h1>
         </div>
