@@ -340,72 +340,65 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
     <div className="w-full flex flex-col items-center">
       {/* (A) 입력 폼 영역 */}
       <div className="w-full flex justify-center">
-        <div
-          className={`w-full max-w-[1200px] p-2 ${
-            isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300'
-          } transition-colors rounded-md`}
+        <form 
+          onSubmit={handleFormSubmit} 
+          className="w-full max-w-[1200px] flex justify-center"
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
         >
-          <form onSubmit={handleFormSubmit} className="w-full flex justify-center">
-            <div
-              className="relative flex flex-col w-full max-w-[1200px] px-4 py-4 
-                         border border-blue-500 focus-within:ring-2 
-                         focus-within:ring-blue-500 text-base transition-colors bg-white rounded-md"
-              style={{ minHeight: '3.5rem' }}
-            >
-              {/* 업로드된 ZIP 파일 표시 */}
-              {fileName && (
-                <div className="flex items-center self-start mb-2 bg-blue-50 border border-blue-200 px-2 py-1">
-                  <span className="text-sm text-blue-600 font-medium">
-                    {fileName}
-                  </span>
-                  <button
-                    onClick={handleRemoveFile}
-                    className="ml-2 text-gray-500 hover:text-gray-700 transition-colors"
-                    title="Remove file"
-                    type="button"
-                  >
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M18 6 6 18" />
-                      <path d="m6 6 12 12" />
-                    </svg>
-                  </button>
-                </div>
-              )}
-
-              {/* GitHub Link + Go 버튼 */}
-              <div className="flex">
-                <input
-                  type="text"
-                  placeholder="GitHub link or drag/drop a ZIP file"
-                  value={githubLink}
-                  onChange={(e) => setGithubLink(e.target.value)}
-                  className={`flex-grow border border-blue-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 ${
-                    isDragging ? 'bg-blue-50' : 'bg-white'
-                  }`}
-                  style={{ borderRadius: '4px', width: '100%', minWidth: '500px' }}
-                  />
+          <div className="relative flex flex-col w-full">
+            {/* 업로드된 ZIP 파일 표시 - ZIP 파일이 있을 때만 표시 */}
+            {fileName && (
+              <div className="flex items-center self-start mb-2 bg-blue-50 border border-blue-200 px-2 py-1">
+                <span className="text-sm text-blue-600 font-medium">
+                  {fileName}
+                </span>
                 <button
-                  type="submit"
-                  className="px-4 py-2 text-sm bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-md cursor-pointer"                  disabled={!githubLink && !file}
+                  onClick={handleRemoveFile}
+                  className="ml-2 text-gray-500 hover:text-gray-700 transition-colors cursor-pointer"
+                  title="Remove file"
+                  type="button"
                 >
-                  {isGoLoading ? 'Loading...' : 'Go'}
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M18 6 6 18" />
+                    <path d="m6 6 12 12" />
+                  </svg>
                 </button>
               </div>
+            )}
+
+            {/* GitHub Link + Go 버튼 */}
+            <div className="flex">
+              <input
+                type="text"
+                placeholder="GitHub link or drag/drop a ZIP file"
+                value={githubLink}
+                onChange={(e) => setGithubLink(e.target.value)}
+                className={`flex-grow border border-blue-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                  isDragging ? 'bg-blue-50' : 'bg-white'
+                } rounded-l-md`}
+                style={{ width: '100%', minWidth: '500px' }}
+              />
+              <button
+                type="submit"
+                className="px-4 py-2 text-sm bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-r-md cursor-pointer"
+                disabled={!githubLink && !file}
+              >
+                {isGoLoading ? 'Loading...' : 'Go'}
+              </button>
             </div>
-          </form>
-        </div>
+          </div>
+        </form>
       </div>
 
       {/* (B) 로딩 (Go) */}
