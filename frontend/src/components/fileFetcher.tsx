@@ -410,7 +410,7 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
 
       {/* (B) 로딩 (Go) */}
       {isGoLoading && (
-        <div className="mt-4 w-full max-w-[800px] mx-auto flex justify-center">
+        <div className="mt-8 w-full max-w-[800px] mx-auto flex justify-center">
           <img
             src="/logo.png"
             alt="Loading"
@@ -644,7 +644,7 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
 
       {/* (E) 로딩 (Merge) */}
       {isMergeLoading && (
-        <div className="mt-4 w-full max-w-[800px] mx-auto flex justify-center">
+        <div className="mt-10 w-full max-w-[800px] mx-auto flex justify-center">
           <img
             src="/logo.png"
             alt="Loading"
