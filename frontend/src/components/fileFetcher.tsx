@@ -341,18 +341,18 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
       {/* (A) 입력 폼 영역 */}
       <div className="w-full flex justify-center">
         <div
-          className={`w-full max-w-[800px] p-2 ${
+          className={`w-full max-w-[1200px] p-2 ${
             isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300'
-          } transition-colors`}
+          } transition-colors rounded-md`}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
         >
           <form onSubmit={handleFormSubmit} className="w-full flex justify-center">
             <div
-              className="relative flex flex-col w-full max-w-[800px] px-4 py-4 
+              className="relative flex flex-col w-full max-w-[1200px] px-4 py-4 
                          border border-blue-500 focus-within:ring-2 
-                         focus-within:ring-blue-500 text-base transition-colors bg-white"
+                         focus-within:ring-blue-500 text-base transition-colors bg-white rounded-md"
               style={{ minHeight: '3.5rem' }}
             >
               {/* 업로드된 ZIP 파일 표시 */}
@@ -394,11 +394,11 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
                   className={`flex-grow border border-blue-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 ${
                     isDragging ? 'bg-blue-50' : 'bg-white'
                   }`}
-                />
+                  style={{ borderRadius: '4px', width: '100%', minWidth: '500px' }}
+                  />
                 <button
                   type="submit"
-                  className="px-4 py-2 text-sm bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={!githubLink && !file}
+                  className="px-4 py-2 text-sm bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-md cursor-pointer"                  disabled={!githubLink && !file}
                 >
                   {isGoLoading ? 'Loading...' : 'Go'}
                 </button>
