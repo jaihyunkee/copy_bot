@@ -39,11 +39,12 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
     }
   }, [sessionId]);
 
-  // 스크롤 이벤트 예시 (디자인 용)
+  // (디자인) 스크롤 이벤트 예시
   useEffect(() => {
     const handleScroll = () => {
       if (filesContainerRef.current) {
         const { top } = filesContainerRef.current.getBoundingClientRect();
+        // console.log(top);
       }
     };
     window.addEventListener('scroll', handleScroll);
@@ -81,7 +82,7 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
     }
   }, [files, selectedExtensions]);
 
-  // 필터가 바뀌면 현재 화면에 표시된 파일들 모두 선택
+  // 필터 변경 시 표시된 파일들 자동 선택
   useEffect(() => {
     if (filteredFiles.length > 0) {
       setSelectedFiles(new Set(filteredFiles));
@@ -102,12 +103,10 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
     setIsGoLoading(true);
 
     const formData = new FormData();
-    // sessionId가 있으면 같이 전송
     if (sessionId) {
       formData.append('session_id', sessionId);
     }
-    // githubLink와 file 둘 다 서버에 보냄
-    // (서버에서 우선순위 결정: githubLink > file)
+    // 서버에서 우선순위 결정: 파일이 있으면 unzip, 없으면 githubLink로 clone
     if (githubLink) {
       formData.append('githubLink', githubLink);
     }
@@ -121,7 +120,7 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
         body: formData,
       });
 
-      // 가벼운 지연 (UI 애니메이션 효과용)
+      // UX 상의 지연
       await new Promise(resolve => setTimeout(resolve, 1500));
 
       if (response.ok) {
@@ -132,7 +131,6 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
         if (result.session_id) {
           setSessionId(result.session_id);
         }
-
         setFiles(result.file_paths);
         setShowFiles(true);
         setSelectedExtensions([]);
@@ -180,14 +178,16 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
   const handleZipFile = (file: File) => {
     setFile(file);
     setFileName(file.name);
-    // githubLink 인풋에 표시하기 위한 임시값
-    setGithubLink(`${file.name} (Uploaded ZIP file)`);
+    // 파일을 올리면, GitHub 링크는 비워 버린다.
+    // => 서버에서 zip 우선으로 인식
+    setGithubLink('');
   };
 
   // ZIP 파일 제거 (X 버튼)
   const handleRemoveFile = () => {
     setFile(null);
     setFileName(null);
+    // 깃허브 링크도 같이 초기화할지 여부는 상황에 맞게
     setGithubLink('');
     setFiles([]);
     setFilteredFiles([]);
@@ -206,7 +206,7 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
     );
   };
 
-  // 개별 파일 선택 토글
+  // 파일(체크박스) 선택
   const toggleFileSelection = (filePath: string) => {
     setSelectedFiles(prev => {
       const newSet = new Set(prev);
@@ -219,7 +219,7 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
     });
   };
 
-  // 파일 표시이름 (경로 압축)
+  // 표시에 쓸 파일명 (중간 경로 생략)
   const getDisplayPath = (filePath: string) => {
     const pathParts = filePath.split('/');
     const fileName = pathParts[pathParts.length - 1];
@@ -231,7 +231,7 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
   };
 
   // ==========================
-  // (2) /merge_codes: 선택된 파일들 합치기
+  // (2) /merge_codes: 선택된 파일 합쳐서 클립보드에 복사
   // ==========================
   const handleMergeAndCopy = async () => {
     if (!sessionId || selectedFiles.size === 0) {
@@ -249,10 +249,10 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
     try {
       const response = await fetch(`http://127.0.0.1:5000/merge_codes?${params.toString()}`, {
         method: 'GET',
-        headers: { 'Accept': 'text/plain' },
+        headers: { Accept: 'text/plain' },
       });
 
-      // 가벼운 지연 (UI 애니메이션 효과용)
+      // UX 지연
       await new Promise(resolve => setTimeout(resolve, 1500));
 
       if (response.ok) {
@@ -268,7 +268,7 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
           })
           .catch(err => console.error('Failed to copy:', err));
 
-        // 스크롤 이동
+        // 병합 결과로 스크롤 이동
         setTimeout(() => {
           if (mergedCodeRef.current) {
             mergedCodeRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -287,7 +287,7 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
     }
   };
 
-  // Merged Code 수동 복사
+  // 병합된 코드 수동 복사
   const handleCopyClick = () => {
     navigator.clipboard.writeText(mergedCode)
       .then(() => {
@@ -297,7 +297,7 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
       .catch(err => console.error('Failed to copy:', err));
   };
 
-  // Merged Code가 위치/크기 변경 시, 가운데 정렬 유지
+  // Merged Code가 리사이즈/마우스업으로 위치가 바뀌면 가운데 정렬
   const centerMergedCodeContainer = () => {
     if (mergedCodeRef.current) {
       const container = mergedCodeRef.current.querySelector('.resizable-container') as HTMLElement;
@@ -333,12 +333,15 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
     }
   }, [mergedCode]);
 
+  // ----------------------
+  // 실제 렌더링
+  // ----------------------
   return (
     <div className="w-full flex flex-col items-center">
       {/* (A) 입력 폼 영역 */}
       <div className="w-full flex justify-center">
         <div
-          className={`w-full max-w-[800px] rounded-lg p-2 ${
+          className={`w-full max-w-[800px] p-2 ${
             isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300'
           } transition-colors`}
           onDragOver={handleDragOver}
@@ -348,14 +351,16 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
           <form onSubmit={handleFormSubmit} className="w-full flex justify-center">
             <div
               className="relative flex flex-col w-full max-w-[800px] px-4 py-4 
-                         border border-gray-300 rounded-4xl focus-within:ring-2 
+                         border border-blue-500 focus-within:ring-2 
                          focus-within:ring-blue-500 text-base transition-colors bg-white"
               style={{ minHeight: '3.5rem' }}
             >
               {/* 업로드된 ZIP 파일 표시 */}
               {fileName && (
-                <div className="flex items-center self-start mb-2 bg-blue-50 border border-blue-200 rounded-lg px-2 py-1">
-                  <span className="text-sm text-blue-600 font-medium">{fileName}</span>
+                <div className="flex items-center self-start mb-2 bg-blue-50 border border-blue-200 px-2 py-1">
+                  <span className="text-sm text-blue-600 font-medium">
+                    {fileName}
+                  </span>
                   <button
                     onClick={handleRemoveFile}
                     className="ml-2 text-gray-500 hover:text-gray-700 transition-colors"
@@ -386,13 +391,13 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
                   placeholder="GitHub link or drag/drop a ZIP file"
                   value={githubLink}
                   onChange={(e) => setGithubLink(e.target.value)}
-                  className={`flex-grow border border-gray-300 rounded-l-xl px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                  className={`flex-grow border border-blue-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 ${
                     isDragging ? 'bg-blue-50' : 'bg-white'
                   }`}
                 />
                 <button
                   type="submit"
-                  className="px-4 py-2 text-sm bg-blue-600 text-white rounded-r-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 py-2 text-sm bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                   disabled={!githubLink && !file}
                 >
                   {isGoLoading ? 'Loading...' : 'Go'}
@@ -425,7 +430,7 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
             >
               <button
                 onClick={() => toggleExtension(ext)}
-                className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+                className={`inline-flex items-center px-3 py-1 text-sm font-medium transition-colors ${
                   selectedExtensions.includes(ext)
                     ? 'bg-blue-600 text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -491,7 +496,7 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
         >
           {/* 왼쪽: 파일 리스트 */}
           <div
-            className="bg-white rounded-lg border border-gray-200 p-4 animate-slideUp h-[500px] overflow-y-auto"
+            className="bg-white border border-gray-200 p-4 animate-slideUp h-[500px] overflow-y-auto"
             style={{
               minWidth: '400px',
               width: '800px',
@@ -527,7 +532,7 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
                     />
                     <label
                       htmlFor={`file-${index}`}
-                      className="flex items-center p-2 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors peer-checked:border-blue-600 peer-checked:bg-blue-50 text-xs"
+                      className="flex items-center p-2 border border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors peer-checked:border-blue-600 peer-checked:bg-blue-50 text-xs"
                       title={file}
                     >
                       <svg
@@ -544,7 +549,9 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
                         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                         <path d="M14 2v4a2 2 0 0 0 2 2h4"></path>
                       </svg>
-                      <span className="truncate flex-grow">{getDisplayPath(file)}</span>
+                      <span className="truncate flex-grow">
+                        {getDisplayPath(file)}
+                      </span>
                       {selectedFiles.has(file) && (
                         <svg
                           width="12"
@@ -575,7 +582,7 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
           {/* 오른쪽: 선택된 파일 */}
           <div
             ref={selectedFilesContainerRef}
-            className="border border-gray-200 rounded-lg shadow-lg bg-white animate-slideRight flex flex-col"
+            className="border border-gray-200 shadow-lg bg-white animate-slideRight flex flex-col"
             style={{
               width: '200px',
               height: '500px',
@@ -585,7 +592,7 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
               overflow: 'auto',
             }}
           >
-            <div className="p-3 border-b border-gray-200 bg-gray-50 rounded-t-lg">
+            <div className="p-3 border-b border-gray-200 bg-gray-50">
               <h3 className="font-semibold text-sm">Selected Files</h3>
               <p className="text-xs text-gray-500 mt-1">
                 {Array.from(selectedFiles).length} files
@@ -595,7 +602,7 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
               {Array.from(selectedFiles).map((file, index) => (
                 <div
                   key={index}
-                  className="p-1 hover:bg-gray-100 rounded text-xs flex items-center animate-fadeIn"
+                  className="p-1 hover:bg-gray-100 text-xs flex items-center animate-fadeIn"
                   style={{ animationDelay: `${Math.min(index * 30, 500)}ms` }}
                   title={file}
                 >
@@ -625,7 +632,7 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
             <div className="p-2 border-t border-gray-200">
               <button
                 onClick={handleMergeAndCopy}
-                className="w-full px-4 py-2 bg-white text-blue-600 rounded-lg text-sm font-medium border border-blue-600 hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 shadow-md hover:shadow-lg disabled:text-blue-300 disabled:border-blue-300 disabled:cursor-not-allowed cursor-pointer"
+                className="w-full px-4 py-2 bg-white text-blue-600 text-sm font-medium border border-blue-600 hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 shadow-md hover:shadow-lg disabled:text-blue-300 disabled:border-blue-300 disabled:cursor-not-allowed cursor-pointer"
                 disabled={selectedFiles.size === 0}
               >
                 Merge & Copy
@@ -658,7 +665,7 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
           }}
         >
           <div
-            className="bg-white rounded-lg border border-gray-200 p-4 animate-slideUp resizable-container"
+            className="bg-white border border-gray-200 p-4 animate-slideUp resizable-container"
             style={{
               minWidth: '400px',
               width: '800px',
@@ -708,7 +715,7 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
                 )}
               </button>
             </div>
-            <div className="bg-gray-50 p-4 rounded-lg max-h-[600px] overflow-y-auto">
+            <div className="bg-gray-50 p-4 max-h-[600px] overflow-y-auto">
               <pre className="text-sm text-left whitespace-pre-wrap break-words">
                 {mergedCode}
               </pre>
