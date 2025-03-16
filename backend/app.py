@@ -19,7 +19,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 세션ID -> 폴더 경로
+# 세션ID -> 폴더 경로 매핑
 SESSION_MAP = {}  # { session_id: "/absolute/path/to/user_clone/<session_id>" }
 
 # 500MB (폴더 최대 크기 예시)
@@ -197,7 +197,6 @@ def merge_codes(
     combined_text = ""
     for rel_path in file_path:
         real_path = os.path.join(folder_path, rel_path)
-        filename = os.path.basename(real_path)
 
         if not os.path.isfile(real_path):
             combined_text += f"[{rel_path}]\n파일이 존재하지 않습니다.\n\n"
@@ -224,13 +223,13 @@ def merge_codes(
         if content is None:
             # 둘 다 실패
             combined_text += (
-                f"[{filename}]\n"
+                f"[{rel_path}]\n"
                 f"인코딩 오류 발생 (UTF-8, CP949 모두 실패)\n"
                 f"에러 상세: {error_messages}\n\n"
             )
         else:
-            # 성공 읽기
-            combined_text += f"[{filename}]\n{content}\n\n"
+            # 성공적으로 읽었다면, 전체 path(rel_path) 표시
+            combined_text += f"[{rel_path}]\n{content}\n\n"
 
     return PlainTextResponse(content=combined_text, status_code=200)
 
