@@ -83,48 +83,51 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!githubLink && !file) {
-      alert("Please enter a GitHub link or upload a ZIP file.");
-      return;
+        alert("Please enter a GitHub link or upload a ZIP file.");
+        return;
     }
     setIsGoLoading(true);
 
+    // Reset Selected Files
+    setSelectedFiles(new Set());
+
     const formData = new FormData();
     if (sessionId) {
-      formData.append('session_id', sessionId);
+        formData.append('session_id', sessionId);
     }
     if (githubLink) {
-      formData.append('githubLink', githubLink);
+        formData.append('githubLink', githubLink);
     }
     if (file) {
-      formData.append('file', file);
+        formData.append('file', file);
     }
 
     try {
-      const response = await fetch('http://127.0.0.1:5000/go', {
-        method: 'POST',
-        body: formData,
-      });
+        const response = await fetch('http://127.0.0.1:5000/go', {
+            method: 'POST',
+            body: formData,
+        });
 
-      await new Promise(resolve => setTimeout(resolve, 1500));
+        await new Promise(resolve => setTimeout(resolve, 1500));
 
-      if (response.ok) {
-        const result = await response.json();
-        if (result.session_id) {
-          setSessionId(result.session_id);
+        if (response.ok) {
+            const result = await response.json();
+            if (result.session_id) {
+                setSessionId(result.session_id);
+            }
+            setFiles(result.file_paths);
+            setShowFiles(true);
+            setSelectedExtensions([]);
+        } else {
+            const err = await response.json();
+            alert(`Error: ${err.error || 'Failed to process the request'}`);
         }
-        setFiles(result.file_paths);
-        setShowFiles(true);
-        setSelectedExtensions([]);
-      } else {
-        const err = await response.json();
-        alert(`Error: ${err.error || 'Failed to process the request'}`);
-      }
     } catch (error) {
-      alert("An error occurred while sending the request.");
+        alert("An error occurred while sending the request.");
     } finally {
-      setIsGoLoading(false);
+        setIsGoLoading(false);
     }
-  };
+};
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
