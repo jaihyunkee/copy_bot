@@ -323,7 +323,22 @@ const FileFetcher: React.FC<FileFetcherProps> = ({
                 type="text"
                 placeholder="GitHub link or drag/drop a ZIP file"
                 value={githubLink}
-                onChange={(e) => setGithubLink(e.target.value)}
+                onChange={(e) => {
+                  if (file) {
+                    // Reset the uploaded ZIP file when user types in input field
+                    setFile(null);
+                    setFileName(null);
+                    setFiles([]);
+                    setFilteredFiles([]);
+                    setShowFiles(false);
+                    setExtensions([]);
+                    setSelectedExtensions([]);
+                    setSelectedFiles(new Set());
+                    setMergedCode('');
+                    setIsCopied(false);
+                  }
+                  setGithubLink(e.target.value);
+                }}
                 className={`flex-grow border border-blue-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 ${isDragging ? 'bg-blue-50' : 'bg-white'} rounded-l-md`}
                 style={{ width: '100%', minWidth: '500px' }}
               />
