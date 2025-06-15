@@ -1,8 +1,8 @@
 # 📋 CoPT (Copy Project Tool)
 
-**CoPT**는 GitHub 리포지토리 또는 ZIP 파일을 업로드하여 프로젝트 파일을 분석하고, 선택한 파일들의 코드를 하나의 텍스트로 병합해주는 풀스택 웹 애플리케이션입니다.
+**CoPT** is a full-stack web application that analyzes project files by uploading GitHub repositories or ZIP files, and merges selected files' code into a single text output.
 
-## 🏗️ 프로젝트 아키텍처
+## 🏗️ Project Architecture
 
 ```
 copy_bot/
@@ -13,112 +13,112 @@ copy_bot/
 │   └── package.json
 ├── backend/           # FastAPI + Python
 │   └── app.py
-├── requirements.txt   # Python 의존성
+├── requirements.txt   # Python dependencies
 └── README.md
 ```
 
-### 🔧 기술 스택
+### 🔧 Tech Stack
 
 **Frontend:**
-- **Next.js 15.2.1** - React 프레임워크
-- **React 19** - UI 라이브러리
-- **TypeScript** - 타입 안전성
-- **Tailwind CSS 4** - 스타일링
-- **React Dropzone** - 파일 드래그 앤 드롭
-- **Lucide React** - 아이콘
+- **Next.js 15.2.1** - React framework
+- **React 19** - UI library
+- **TypeScript** - Type safety
+- **Tailwind CSS 4** - Styling
+- **React Dropzone** - File drag & drop
+- **Lucide React** - Icons
 
 **Backend:**
-- **FastAPI** - 현대적인 Python 웹 프레임워크
-- **Python 3.9+** - 백엔드 언어
-- **Uvicorn** - ASGI 서버
-- **CORS 미들웨어** - 크로스 오리진 요청 지원
+- **FastAPI** - Modern Python web framework
+- **Python 3.9+** - Backend language
+- **Uvicorn** - ASGI server
+- **CORS Middleware** - Cross-origin request support
 
-## 🚀 주요 기능
+## 🚀 Key Features
 
-### 1. **다중 입력 지원**
-- **GitHub 리포지토리**: SSH/HTTPS URL 지원
+### 1. **Multiple Input Support**
+- **GitHub Repository**: SSH/HTTPS URL support
   - `git@github.com:owner/repo.git`
   - `https://github.com/owner/repo.git`
-- **ZIP 파일 업로드**: 드래그 앤 드롭 또는 파일 선택
+- **ZIP File Upload**: Drag & drop or file selection
 
-### 2. **스마트 파일 필터링**
-- 숨김 파일/폴더 자동 제외 (`.` 시작)
-- 캐시 폴더 자동 제외
-- 파일 확장자별 필터링
-- 실시간 파일 검색
+### 2. **Smart File Filtering**
+- Auto-exclude hidden files/folders (starting with `.`)
+- Auto-exclude cache folders
+- File extension filtering
+- Real-time file search
 
-### 3. **프로젝트 안전성**
-- **500MB 크기 제한**: 대용량 프로젝트 방지
-- **세션 기반 관리**: UUID를 통한 세션 격리
-- **자동 임시 폴더 정리**: Git 메타데이터 제거
+### 3. **Project Safety**
+- **500MB Size Limit**: Prevents large project processing
+- **Session-based Management**: Session isolation via UUID
+- **Auto Cleanup**: Git metadata removal
 
-### 4. **코드 병합 및 내보내기**
-- 선택한 파일들의 코드를 하나의 텍스트로 병합
-- 파일별 구분자 포함 (`[filename]` 형식)
-- **다중 인코딩 지원**: UTF-8, CP949 자동 감지
-- 원클릭 클립보드 복사
+### 4. **Code Merging & Export**
+- Merge selected files into single text output
+- File separators included (`[filename]` format)
+- **Multi-encoding Support**: UTF-8, CP949 auto-detection
+- One-click clipboard copy
 
-### 5. **사용자 친화적 UI**
-- 반응형 디자인
-- 파일 트리 구조 표시
-- 실시간 로딩 상태
-- 선택된 파일 개수 표시
+### 5. **User-friendly UI**
+- Responsive design
+- File tree structure display
+- Real-time loading states
+- Selected files counter
 
-## 🛠️ 설치 및 실행
+## 🛠️ Installation & Setup
 
-### 사전 요구사항
-- **Node.js** 18.0.0 이상
-- **Python** 3.9 이상
-- **Git** (GitHub 클론 기능용)
-- **unzip** 명령어 (ZIP 파일 해제용)
+### Prerequisites
+- **Node.js** 18.0.0 or higher
+- **Python** 3.9 or higher
+- **Git** (for GitHub clone functionality)
+- **unzip** command (for ZIP file extraction)
 
-### 1. 프로젝트 클론
+### 1. Clone Project
 ```bash
 git clone <repository-url>
 cd copy_bot
 ```
 
-### 2. 백엔드 설정
+### 2. Backend Setup
 ```bash
-# Python 의존성 설치
+# Install Python dependencies
 pip install -r requirements.txt
 
-# 백엔드 서버 실행
+# Run backend server
 cd backend
 python app.py
-# 또는
+# or
 uvicorn app:app --host 127.0.0.1 --port 5000 --reload
 ```
 
-### 3. 프론트엔드 설정
+### 3. Frontend Setup
 ```bash
-# 새 터미널에서
+# In new terminal
 cd frontend
 
-# 의존성 설치
+# Install dependencies
 npm install
 
-# 개발 서버 실행
+# Run development server
 npm run dev
 ```
 
-### 4. 애플리케이션 접속
-- 프론트엔드: `http://localhost:3000`
-- 백엔드 API: `http://localhost:5000`
+### 4. Access Application
+- Frontend: `http://localhost:3000`
+- Backend API: `http://localhost:5000`
 
-## 📚 API 문서
+## 📚 API Documentation
 
 ### POST `/go`
-프로젝트 파일을 가져오고 분석합니다.
+Fetch and analyze project files.
 
-**요청 (Form Data):**
+**Request (Form Data):**
 ```
-session_id: string (선택사항)
-githubLink: string (선택사항)
-file: File (ZIP 파일, 선택사항)
+session_id: string (optional)
+githubLink: string (optional)
+file: File (ZIP file, optional)
 ```
 
-**응답:**
+**Response:**
 ```json
 {
   "session_id": "uuid-string",
@@ -127,15 +127,15 @@ file: File (ZIP 파일, 선택사항)
 ```
 
 ### GET `/merge_codes`
-선택된 파일들의 코드를 병합합니다.
+Merge selected files' code.
 
-**쿼리 파라미터:**
+**Query Parameters:**
 ```
-session_id: string (필수)
-file_path: string[] (하나 이상 필수)
+session_id: string (required)
+file_path: string[] (one or more required)
 ```
 
-**응답:**
+**Response:**
 ```
 [src/app.py]
 import os
@@ -147,102 +147,102 @@ import React from 'react'
 ...
 ```
 
-## 🔄 사용 방법
+## 🔄 Usage Guide
 
-### 1. 프로젝트 가져오기
-- **GitHub**: URL을 입력하고 "Go" 버튼 클릭
-- **ZIP 파일**: 파일을 드래그 앤 드롭하거나 선택
+### 1. Import Project
+- **GitHub**: Enter URL and click "Go" button
+- **ZIP File**: Drag & drop or select file
 
-### 2. 파일 필터링
-- 확장자별 필터 사용 (`.js`, `.py`, `.tsx` 등)
-- 파일 이름으로 검색
+### 2. Filter Files
+- Use extension filters (`.js`, `.py`, `.tsx`, etc.)
+- Search by filename
 
-### 3. 파일 선택
-- 개별 파일 체크박스 클릭
-- 전체 선택/해제 버튼 사용
+### 3. Select Files
+- Click individual file checkboxes
+- Use select all/deselect all buttons
 
-### 4. 코드 병합
-- "Merge Selected Files" 버튼 클릭
-- 결과를 클립보드에 복사
+### 4. Merge Code
+- Click "Merge Selected Files" button
+- Copy result to clipboard
 
-## 🔒 보안 고려사항
+## 🔒 Security Considerations
 
-### ⚠️ 주의사항
-- **임의 코드 실행 위험**: Git clone과 ZIP 압축 해제 시 보안 위험 존재
-- **세션 데이터 관리**: `user_clone/` 폴더의 세션 데이터가 자동 삭제되지 않음
+### ⚠️ Warnings
+- **Arbitrary Code Execution Risk**: Security risks exist with Git clone and ZIP extraction
+- **Session Data Management**: Session data in `user_clone/` folder is not auto-deleted
 
-### 🛡️ 보안 권장사항
-- 프로덕션 환경에서는 샌드박스 환경 구성
-- 바이러스 스캔 도구 연동
-- 정기적인 임시 폴더 정리 스크립트 구현
-- HTTPS 사용 및 CORS 설정 검토
+### 🛡️ Security Recommendations
+- Configure sandbox environment for production
+- Integrate virus scanning tools
+- Implement regular temp folder cleanup scripts
+- Review HTTPS usage and CORS settings
 
-## 🔧 개발 및 배포
+## 🔧 Development & Deployment
 
-### 개발 모드
+### Development Mode
 ```bash
-# 백엔드 (자동 재로드)
+# Backend (auto-reload)
 uvicorn app:app --reload --host 127.0.0.1 --port 5000
 
-# 프론트엔드 (핫 리로드)
+# Frontend (hot reload)
 npm run dev
 ```
 
-### 프로덕션 빌드
+### Production Build
 ```bash
-# 프론트엔드 빌드
+# Frontend build
 cd frontend
 npm run build
 npm start
 
-# 백엔드 프로덕션 서버
+# Backend production server
 cd backend
 uvicorn app:app --host 0.0.0.0 --port 5000
 ```
 
-## 🧪 테스트
+## 🧪 Testing
 
-### API 테스트 예시
+### API Test Examples
 ```bash
-# GitHub 리포지토리 가져오기
+# Fetch GitHub repository
 curl -X POST "http://localhost:5000/go" \
   -F "githubLink=https://github.com/user/repo.git"
 
-# 파일 병합
+# Merge files
 curl "http://localhost:5000/merge_codes?session_id=SESSION_ID&file_path=src/app.py&file_path=README.md"
 ```
 
-## 📈 성능 최적화
+## 📈 Performance Optimization
 
-- **파일 크기 제한**: 500MB로 제한하여 메모리 사용량 관리
-- **선택적 파일 로딩**: 사용자가 선택한 파일만 메모리에 로드
-- **세션 기반 캐싱**: 동일 세션에서 반복 요청 시 캐시 활용
-- **스트리밍 응답**: 대용량 병합 결과를 스트리밍으로 전송
+- **File Size Limit**: 500MB limit for memory usage management
+- **Selective File Loading**: Only user-selected files loaded into memory
+- **Session-based Caching**: Cache utilization for repeated requests in same session
+- **Streaming Response**: Stream large merge results
 
-## 🤝 기여하기
+## 🤝 Contributing
 
-### 개발 환경 설정
-1. 이 리포지토리를 포크합니다
-2. 새 기능 브랜치를 생성합니다 (`git checkout -b feature/amazing-feature`)
-3. 변경사항을 커밋합니다 (`git commit -m 'Add amazing feature'`)
-4. 브랜치에 푸시합니다 (`git push origin feature/amazing-feature`)
-5. Pull Request를 생성합니다
+### Development Environment Setup
+1. Fork this repository
+2. Create a new feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Create a Pull Request
 
-### 버그 리포트
-- GitHub Issues를 통해 버그를 신고해주세요
-- 재현 가능한 단계와 환경 정보를 포함해주세요
+### Bug Reports
+- Report bugs through GitHub Issues
+- Include reproducible steps and environment information
 
-## 📄 라이선스
+## 📄 License
 
-이 프로젝트는 MIT 라이선스 하에 배포됩니다. 자세한 내용은 `LICENSE` 파일을 참조하세요.
+This project is distributed under the MIT License. See the `LICENSE` file for details.
 
-## 🙏 감사의 말
+## 🙏 Acknowledgments
 
-- **FastAPI**: 빠르고 현대적인 웹 프레임워크
-- **Next.js**: 강력한 React 프레임워크
-- **Tailwind CSS**: 유틸리티 우선 CSS 프레임워크
-- **오픈소스 커뮤니티**: 이 프로젝트를 가능하게 해준 모든 라이브러리들
+- **FastAPI**: Fast and modern web framework
+- **Next.js**: Powerful React framework
+- **Tailwind CSS**: Utility-first CSS framework
+- **Open Source Community**: All libraries that made this project possible
 
 ---
 
-💡 **팁**: 이 도구는 코드 리뷰, AI 모델 훈련 데이터 준비, 프로젝트 분석 등 다양한 용도로 활용할 수 있습니다.
+💡 **Tip**: This tool can be used for various purposes such as code review, AI model training data preparation, and project analysis.
