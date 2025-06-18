@@ -1,4 +1,4 @@
-# 📋 CoPT (Copy Project Tool)
+# 📋 CoPT (Copy  (G)PT)
 
 **CoPT** is a full-stack web application that analyzes project files by uploading GitHub repositories or ZIP files, and merges selected files' code into a single text output.
 
